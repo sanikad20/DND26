@@ -1,20 +1,32 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+/// Manages the backend base URL.
+/// Falls back to localhost (emulator only) if never configured.
 class ApiConfig {
-  static String get baseUrl {
-    if (kIsWeb) {
-      return 'http://127.0.0.1:8000';
-    }
+  ApiConfig._();
+  static final ApiConfig instance = ApiConfig._();
 
-    if (Platform.isAndroid) {
-      // Emulator
-      return 'http://10.0.2.2:8000';
+  static const _key         = 'backend_base_url';
+  static const _defaultUrl  = 'http://127.0.0.1:8000'; // emulator fallback
 
-      // Real phone:
-      // return 'http://192.168.1.5:8000';
-    }
+  String _baseUrl = _defaultUrl;
+  String get baseUrl => _baseUrl;
 
-    return 'http://127.0.0.1:8000';
+  /// Call once at app startup (before any API calls)
+  Future<void> init() async {
+    final prefs = await SharedPreferences.getInstance();
+    _baseUrl = prefs.getString(_key) ?? _defaultUrl;
   }
+
+  /// Save a new URL (called from settings screen)
+  Future<void> setBaseUrl(String url) async {
+    // Strip trailing slash for consistency
+    final clean = url.trimRight().replaceAll(RegExp(r'/+$'), '');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, clean);
+    _baseUrl = clean;
+  }
+
+  /// True if user has configured a real URL (not the default fallback)
+  bool get isConfigured => _baseUrl != _defaultUrl;
 }

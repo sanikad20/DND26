@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-const String _baseUrl = 'http://10.224.180.235:8000';
+const String _baseUrl = 'http://10.109.220.235:8000';
 
 // ─── Day usage model ──────────────────────────────────────────────────────────
 
