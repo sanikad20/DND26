@@ -1,12 +1,12 @@
 fastapi
-uvicorn[standard]
-pydantic[email]
+uvicorn
 sqlalchemy
+pydantic[email]
 passlib[bcrypt]
 torch
-torchvision
-numpy
 tensorflow
 joblib
+numpy
 scikit-learn
 python-multipart
+email-validator

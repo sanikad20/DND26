@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-
-const String _baseUrl = 'http://10.109.220.235:8000';
+import 'api_config.dart';
 
 // ─── Day usage model ──────────────────────────────────────────────────────────
 
@@ -59,9 +58,9 @@ class DayUsage {
 // ─── Results ──────────────────────────────────────────────────────────────────
 
 class BurnoutResult {
-  final double score;      // 1–10
-  final String level;      // "Low 🟢" / "Moderate 🟠" / "High 🔴"
-  final String source;     // "Manual" / "LSTM"
+  final double score;
+  final String level;
+  final String source;
   final Map<String, double>? personalBaseline;
   final Map<String, double>? todayVsBaseline;
 
@@ -80,11 +79,14 @@ class ApiService {
   ApiService._();
   static final ApiService instance = ApiService._();
 
-  // ── Manual PyTorch /predict — 1–10 scale ─────────────────────────────────
+  // Reads URL from ApiConfig (set by user in settings, persisted in prefs)
+  String get _base => ApiConfig.instance.baseUrl;
+
+  // ── Manual PyTorch /predict ───────────────────────────────────────────────
   Future<BurnoutResult> predictManual(DayUsage day) async {
     final response = await http
         .post(
-          Uri.parse('$_baseUrl/predict'),
+          Uri.parse('$_base/predict'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'sleep_hours':           day.sleepHours,
@@ -116,9 +118,7 @@ class ApiService {
     throw Exception('/predict error ${response.statusCode}: ${response.body}');
   }
 
-  // ── LSTM /predict_lstm — personalised 7-day baseline + today ─────────────
-  // pastDays: list of 7 DayUsage (oldest first, index 0 = 7 days ago)
-  // today:    today's DayUsage
+  // ── LSTM /predict_lstm ────────────────────────────────────────────────────
   Future<BurnoutResult> predictLSTM({
     required List<DayUsage> pastDays,
     required DayUsage today,
@@ -129,29 +129,20 @@ class ApiService {
 
     final body = {
       'history': pastDays.map((d) => d.toJson()).toList(),
-      'today': today.toJson(),
+      'today':   today.toJson(),
     };
 
-    print("REQUEST BODY:");
-    print(jsonEncode(body));
-
     final response = await http.post(
-      Uri.parse('$_baseUrl/predict_lstm'),
+      Uri.parse('$_base/predict_lstm'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(body),
     );
 
-    print("STATUS = ${response.statusCode}");
-    print("BODY = ${response.body}");
-
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
 
-      // Parse personal baseline
-      final pb = (data['user_baseline'] as Map<String, dynamic>?)
+      final pb  = (data['user_baseline'] as Map<String, dynamic>?)
           ?.map((k, v) => MapEntry(k, double.parse(v.toString())));
-
-      // Parse today vs baseline
       final tvb = (data['today_vs_baseline'] as Map<String, dynamic>?)
           ?.map((k, v) => MapEntry(k, double.parse(v.toString())));
 
