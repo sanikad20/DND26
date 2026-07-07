@@ -22,15 +22,12 @@ class _ContinuousMonitoringScreenState
   PersonalBaseline? _baseline;
   double?           _liveScreenTime;
 
-  double? _manualScore;
-  String  _manualLevel = '--';
   double? _lstmScore;
   String  _lstmLevel   = '--';
 
   Map<String, double>? _serverBaseline;
   Map<String, double>? _todayVsBaseline;
 
-  final Map<int, double> _dailyScores = {};
 
   Timer? _autoTimer;
   Timer? _liveTimer;
@@ -90,26 +87,7 @@ class _ContinuousMonitoringScreenState
         _statusMsg      = 'Running burnout models…';
       });
 
-      // ── Step 1: Manual model per day ──────────────────────────────────────
-      _dailyScores.clear();
-      for (int i = 0; i < history.length; i++) {
-        final day = history[i];
-        if (!day.hasData) continue;
-        try {
-          final r = await ApiService.instance.predictManual(
-              _toApiUsage(day, baseline));
-          if (mounted) setState(() => _dailyScores[i] = r.score);
-        } catch (_) {}
-      }
-
-      if (_dailyScores.containsKey(0) && mounted) {
-        setState(() {
-          _manualScore = _dailyScores[0];
-          _manualLevel = _scoreToLevel(_manualScore!);
-        });
-      }
-
-      // ── Step 2: LSTM model ────────────────────────────────────────────────
+      // ── LSTM model ───────────────────────────────────────────────────────
       if (mounted) setState(() => _statusMsg = 'Running LSTM personalised prediction…');
 
       if (history.length >= 8) {
@@ -297,7 +275,7 @@ class _ContinuousMonitoringScreenState
         ]),
       );
 
-  Widget _dualScoreCard() => Container(
+  Widget _lstmScoreCard() => Container(
         margin: const EdgeInsets.only(bottom: 14),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -315,11 +293,7 @@ class _ContinuousMonitoringScreenState
                     fontWeight: FontWeight.w700, fontSize: 14)),
           ]),
           const SizedBox(height: 14),
-          Row(children: [
-            Expanded(child: _scoreBox('Manual Model', _manualScore, _manualLevel)),
-            const SizedBox(width: 10),
-            Expanded(child: _scoreBox('LSTM  (7-day)', _lstmScore, _lstmLevel)),
-          ]),
+          _scoreBox('LSTM  (7-day)', _lstmScore, _lstmLevel),
           if (_todayVsBaseline != null) ...[
             const SizedBox(height: 14),
             const Divider(color: Colors.white12),
@@ -583,10 +557,6 @@ class _ContinuousMonitoringScreenState
     final screenAbove   = b != null && screenDisplay != null &&
         screenDisplay > b.thresholdScreenTime;
 
-    final scoreSpots = _dailyScores.entries
-        .map((e) => FlSpot(e.key.toDouble(), e.value))
-        .toList()..sort((a, b) => a.x.compareTo(b.x));
-
     final screenSpots = _history.asMap().entries
         .map((e) => FlSpot(e.key.toDouble(), e.value.screenTimeHours)).toList();
 
@@ -639,7 +609,7 @@ class _ContinuousMonitoringScreenState
             ),
 
             _baselineCard(),
-            _dualScoreCard(),
+            _lstmScoreCard(),
 
             _card(
               title: 'Screen Time Today  (live)',
@@ -725,15 +695,8 @@ class _ContinuousMonitoringScreenState
               ),
 
             _chart(
-              title: 'Burnout Score  (1–10, 7 days)',
-              spots: scoreSpots, maxY: 10,
-              color: Colors.deepOrangeAccent,
-              threshY: 4, avgY: 7,
-            ),
-            const SizedBox(height: 14),
-            _chart(
               title: 'Screen Time  (hours)',
-              spots: screenSpots, maxY: 16,
+              spots: screenSpots, maxY: screenSpots.isEmpty ? 16.0 : (screenSpots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.3).clamp(4.0, 24.0),
               color: const Color(0xFF8A5CE6),
               threshY: b?.thresholdScreenTime,
               avgY:    b?.avgScreenTime,
@@ -750,7 +713,7 @@ class _ContinuousMonitoringScreenState
             const SizedBox(height: 14),
             _chart(
               title: 'Social App Usage',
-              spots: socialSpots, maxY: 1.0,
+              spots: socialSpots, maxY: socialSpots.isEmpty ? 1.0 : (socialSpots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.3).clamp(0.3, 1.0),
               color: Colors.pinkAccent,
               threshY: b?.thresholdSocialRatio,
               avgY:    b?.avgSocialRatio,

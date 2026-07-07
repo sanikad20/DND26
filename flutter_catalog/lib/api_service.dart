@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'api_config.dart';
-
+import 'package:flutter_catalog/config/api_config.dart';
 // ─── Day usage model ──────────────────────────────────────────────────────────
 
 class DayUsage {

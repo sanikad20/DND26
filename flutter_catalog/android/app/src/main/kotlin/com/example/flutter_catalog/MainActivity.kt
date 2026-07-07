@@ -16,7 +16,6 @@ class MainActivity : FlutterActivity() {
     private val PREFS            = "brainlag_prefs"
     private val KEY_INSTALL_DATE = "install_date_ms"
 
-    // ── Social apps ───────────────────────────────────────────────────────────
     private val socialApps = setOf(
         "com.instagram.android", "com.facebook.katana", "com.twitter.android",
         "com.zhiliaoapp.musically", "com.snapchat.android", "com.reddit.frontpage",
@@ -25,7 +24,6 @@ class MainActivity : FlutterActivity() {
         "com.sharechat.app", "com.moj.app", "com.josh.short.video.status.app",
     )
 
-    // ── Work/productivity apps ────────────────────────────────────────────────
     private val workApps = setOf(
         "com.google.android.gm", "com.microsoft.office.outlook",
         "com.Slack", "us.zoom.videomeetings", "com.microsoft.teams",
@@ -38,7 +36,6 @@ class MainActivity : FlutterActivity() {
         "com.evernote", "com.clickup.tasks",
     )
 
-    // ── Entertainment apps ────────────────────────────────────────────────────
     private val entertainmentApps = setOf(
         "com.google.android.youtube", "com.netflix.mediaclient",
         "com.amazon.avod.thirdpartyclient", "com.hotstar.android",
@@ -48,16 +45,12 @@ class MainActivity : FlutterActivity() {
         "com.jio.media.jiocinema", "tv.twitch.android.app",
     )
 
-    // ── Wellness apps ─────────────────────────────────────────────────────────
     private val wellnessApps = setOf(
         "com.headspace.android", "com.calm.android", "com.strava",
         "com.fitbit.FitbitMobile", "com.samsung.android.shealth",
         "com.google.android.apps.fitness", "com.nike.plusgps",
     )
 
-    // ── System packages to exclude from screen time ───────────────────────────
-    // NOTE: Voice Recorder, NetMirror, browser etc. are intentionally NOT here —
-    // Samsung Digital Wellbeing counts them and so should we.
     private val excludePackages = setOf(
         "com.android.systemui",
         "com.android.launcher", "com.android.launcher2", "com.android.launcher3",
@@ -134,7 +127,6 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    // ── Record install date ───────────────────────────────────────────────────
     private fun recordInstallDate() {
         val prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (!prefs.contains(KEY_INSTALL_DATE)) {
@@ -147,7 +139,6 @@ class MainActivity : FlutterActivity() {
         return prefs.getLong(KEY_INSTALL_DATE, System.currentTimeMillis())
     }
 
-    // ── Permission check ──────────────────────────────────────────────────────
     private fun hasUsagePermission(): Boolean {
         val usm  = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val now  = System.currentTimeMillis()
@@ -156,43 +147,14 @@ class MainActivity : FlutterActivity() {
         return list != null && list.isNotEmpty()
     }
 
-    // ── Reusable: event-based foreground time calculator ─────────────────────
-    //
-    // Three fixes vs the previous version:
-    //
-    // FIX 1 — "Already-open app at window start":
-    //   If an app was brought to foreground BEFORE startMs and never sent a
-    //   BACKGROUND event within the window, the previous code missed its time
-    //   entirely for this window. We now detect this using queryUsageStats:
-    //   if an app has lastTimeUsed < startMs but no FOREGROUND event in the
-    //   window, we seed it as foreground from startMs.
-    //
-    // FIX 2 — SCREEN_NON_INTERACTIVE as session boundary:
-    //   Samsung Digital Wellbeing pauses an app's foreground time when the
-    //   screen turns off. We now listen for SCREEN_NON_INTERACTIVE and treat
-    //   it as an implicit BACKGROUND for the current app, then resume on
-    //   SCREEN_INTERACTIVE. This matches Samsung's counting behaviour and
-    //   fixes gaps caused by long phone-down sessions.
-    //
-    // FIX 3 — Hybrid fallback for old days (>7 days):
-    //   Samsung's UsageEvents store is typically pruned after ~7 days.
-    //   For windows older than 7 days, queryEvents() returns very sparse
-    //   data. We detect this (< 5 foreground events) and fall back to
-    //   totalTimeInForeground with a 0.65 correction factor to approximate
-    //   the event-based result. 0.65 is empirically chosen to cancel out
-    //   the Samsung double-counting inflation (~1.5–1.6x overcounting).
-    //
     private fun calculateScreenTimeFromEvents(startMs: Long, endMs: Long): Long {
         val usm = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
 
-        // ── FIX 3: Sparse-data guard ──────────────────────────────────────────
-        // If window is older than 7 days, events are likely pruned — fall back
-        val windowAgeMs   = System.currentTimeMillis() - startMs
-        val sevenDaysMs   = 7L * 24 * 60 * 60 * 1000
-        val isTooOld      = windowAgeMs > sevenDaysMs
+        val windowAgeMs = System.currentTimeMillis() - startMs
+        val sevenDaysMs = 7L * 24 * 60 * 60 * 1000
+        val isTooOld    = windowAgeMs > sevenDaysMs
 
         if (isTooOld) {
-            // Use corrected totalTimeInForeground as fallback
             val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, startMs, endMs)
             var rawMs = 0L
             stats?.forEach { stat ->
@@ -200,38 +162,31 @@ class MainActivity : FlutterActivity() {
                 val ms  = stat.totalTimeInForeground
                 if (ms > 0 && pkg !in excludePackages) rawMs += ms
             }
-            // 0.65 correction: Samsung totalTimeInForeground overcounts by ~1.5x
             val correctedMs = (rawMs * 0.65).toLong()
-            println("Day (old>7d fallback): startMs=$startMs rawMs=${rawMs/3600000.0} correctedMs=${correctedMs/3600000.0}")
+            println("Day (old>7d fallback): rawMs=${rawMs/3600000.0} correctedMs=${correctedMs/3600000.0}")
             return correctedMs
         }
 
-        // ── FIX 1: Detect already-open app at window start ────────────────────
-        // queryUsageStats gives us lastTimeUsed. If an app's lastTimeUsed is
-        // within a short window before startMs, it was likely still open at
-        // startMs. We'll handle it by seeding it into our state machine below.
         val statsForSeed = usm.queryUsageStats(
             UsageStatsManager.INTERVAL_DAILY,
-            startMs - 60_000L,   // look back 1 min before window
-            startMs + 1_000L     // just past the window start
+            startMs - 60_000L,
+            startMs + 1_000L
         )
         var seededPkg: String? = null
         var seededStart = startMs
-        // Find an app that was "last used" right before our window — likely open
         statsForSeed?.forEach { stat ->
             val pkg = stat.packageName
             if (pkg !in excludePackages &&
                 stat.lastTimeUsed in (startMs - 60_000L) until startMs) {
-                // This app was active just before our window — assume it carries over
                 seededPkg   = pkg
                 seededStart = startMs
             }
         }
 
-        var totalMs        = 0L
-        var currentPkg     = seededPkg          // FIX 1: pre-seed
-        var foregroundStart = seededStart        // FIX 1: start from window open
-        var screenOn       = true                // assume screen starts on
+        var totalMs         = 0L
+        var currentPkg      = seededPkg
+        var foregroundStart = seededStart
+        var screenOn        = true
 
         val events = usm.queryEvents(startMs, endMs)
         val event  = UsageEvents.Event()
@@ -241,21 +196,16 @@ class MainActivity : FlutterActivity() {
             events.getNextEvent(event)
 
             when (event.eventType) {
-
-                // ── FIX 2: Screen off = pause current app's timer ─────────────
                 UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
                     if (screenOn && currentPkg != null && foregroundStart > 0) {
                         totalMs += event.timeStamp - foregroundStart
-                        // Don't clear currentPkg — we'll resume on SCREEN_INTERACTIVE
                         foregroundStart = 0L
                     }
                     screenOn = false
                 }
 
-                // ── FIX 2: Screen on = resume current app's timer ─────────────
                 UsageEvents.Event.SCREEN_INTERACTIVE -> {
                     if (!screenOn && currentPkg != null) {
-                        // Screen came back on with same app still "current"
                         foregroundStart = event.timeStamp
                     }
                     screenOn = true
@@ -263,7 +213,6 @@ class MainActivity : FlutterActivity() {
 
                 UsageEvents.Event.MOVE_TO_FOREGROUND -> {
                     fgEventCount++
-                    // Close previous session (handles missed BACKGROUND or screen-off gaps)
                     if (currentPkg != null && foregroundStart > 0 && screenOn) {
                         totalMs += event.timeStamp - foregroundStart
                     }
@@ -286,10 +235,8 @@ class MainActivity : FlutterActivity() {
             }
         }
 
-        // ── FIX 3 (inline): sparse event check — too few events = stale data ──
-        // If this is within 7 days but we got almost no events, fall back
         if (fgEventCount < 5) {
-            println("Warning: only $fgEventCount FG events for window $startMs-$endMs, using corrected fallback")
+            println("Warning: only $fgEventCount FG events, using corrected fallback")
             val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, startMs, endMs)
             var rawMs = 0L
             stats?.forEach { stat ->
@@ -300,7 +247,6 @@ class MainActivity : FlutterActivity() {
             return (rawMs * 0.65).toLong()
         }
 
-        // Handle app still in foreground at end of window
         if (currentPkg != null && foregroundStart > 0 && screenOn) {
             totalMs += endMs - foregroundStart
         }
@@ -308,7 +254,6 @@ class MainActivity : FlutterActivity() {
         return totalMs
     }
 
-    // ── Live today screen time ────────────────────────────────────────────────
     private fun getTodayLiveScreenTime(): Double {
         val cal = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -322,11 +267,9 @@ class MainActivity : FlutterActivity() {
         return Math.round(totalMs / 3_600_000.0 * 10.0) / 10.0
     }
 
-    // ── Core: one calendar day's data ─────────────────────────────────────────
     private fun getDayUsage(daysAgo: Int): Map<String, Any> {
         val usm = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
 
-        // ── Time range: midnight → midnight of that day ───────────────────────
         val startCal = Calendar.getInstance().apply {
             add(Calendar.DAY_OF_YEAR, -daysAgo)
             set(Calendar.HOUR_OF_DAY, 0)
@@ -341,12 +284,10 @@ class MainActivity : FlutterActivity() {
             startCal.apply { add(Calendar.DAY_OF_YEAR, 1) }.timeInMillis
         }
 
-        // ── Screen time: event-based (matches Digital Wellbeing) ──────────────
+        // ── Screen time: event-based ──────────────────────────────────────────
         val totalMs = calculateScreenTimeFromEvents(startMs, endMs)
 
-        // ── Category breakdown + unique apps: still from queryUsageStats() ─────
-        // totalTimeInForeground used ONLY for relative category weighting,
-        // never added into the overall totalMs total.
+        // ── Category breakdown: from queryUsageStats ──────────────────────────
         val stats = usm.queryUsageStats(
             UsageStatsManager.INTERVAL_DAILY, startMs, endMs)
 
@@ -369,7 +310,7 @@ class MainActivity : FlutterActivity() {
             }
         }
 
-        // ── App switches via UsageEvents ───────────────────────────────────────
+        // ── App switches ──────────────────────────────────────────────────────
         var appSwitches = 0
         var lastPkg     = ""
         try {
@@ -391,9 +332,18 @@ class MainActivity : FlutterActivity() {
 
         // ── Compute ratios ─────────────────────────────────────────────────────
         val screenHours     = Math.round(totalMs / 3_600_000.0 * 10.0) / 10.0
-        val safe            = if (totalMs > 0) totalMs.toDouble() else 1.0
         val hoursForRate    = if (screenHours > 0) screenHours else 1.0
         val switchesPerHour = Math.round(appSwitches.toDouble() / hoursForRate).toInt()
+
+        // FIX: use total of ALL app foreground time as denominator so ratios
+        // are relative to each other and never exceed 1.0 — previously using
+        // event-based totalMs as denominator caused ratios > 1.0 (e.g. 352%)
+        // because totalTimeInForeground (numerator) > event-based ms (denominator)
+        val totalCategoryMs = stats
+            ?.filter { it.totalTimeInForeground > 0 && it.packageName !in excludePackages }
+            ?.sumOf { it.totalTimeInForeground } ?: 1L
+        val safe = if (totalCategoryMs > 0) totalCategoryMs.toDouble() else 1.0
+        fun ratio(ms: Long) = Math.round((ms / safe).coerceAtMost(1.0) * 1000.0) / 1000.0
 
         val dateCal = Calendar.getInstance().apply {
             add(Calendar.DAY_OF_YEAR, -daysAgo)
@@ -401,8 +351,7 @@ class MainActivity : FlutterActivity() {
         val dateLabel = "${dateCal.get(Calendar.DAY_OF_MONTH)}/" +
                         "${dateCal.get(Calendar.MONTH) + 1}"
 
-        // ── Debug logging ──────────────────────────────────────────────────────
-        println("Day=$daysAgo ScreenHours=$screenHours Switches=$appSwitches Apps=${uniqueApps.size}")
+        println("Day=$daysAgo ScreenHours=$screenHours Switches=$appSwitches Apps=${uniqueApps.size} socialRatio=${ratio(socialMs)}")
 
         return mapOf(
             "daysAgo"            to daysAgo,
@@ -411,10 +360,10 @@ class MainActivity : FlutterActivity() {
             "appSwitchesPerHour" to switchesPerHour,
             "totalAppSwitches"   to appSwitches,
             "uniqueAppsPerDay"   to uniqueApps.size,
-            "socialAppRatio"     to Math.round(socialMs    / safe * 1000.0) / 1000.0,
-            "workAppRatio"       to Math.round(workMs       / safe * 1000.0) / 1000.0,
-            "entertainmentRatio" to Math.round(entertainMs  / safe * 1000.0) / 1000.0,
-            "wellnessRatio"      to Math.round(wellnessMs   / safe * 1000.0) / 1000.0,
+            "socialAppRatio"     to ratio(socialMs),
+            "workAppRatio"       to ratio(workMs),
+            "entertainmentRatio" to ratio(entertainMs),
+            "wellnessRatio"      to ratio(wellnessMs),
         )
     }
 }
