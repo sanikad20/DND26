@@ -204,7 +204,9 @@ class UsageService {
       final variance = v.map((x)=>(x-m)*(x-m)).reduce((a,b)=>a+b) / v.length;
       if (variance <= 0) return 0.01;
       double x = variance;
-      for (int i = 0; i < 30; i++) x = (x + variance/x) / 2;
+      for (int i = 0; i < 30; i++) {
+        x = (x + variance/x) / 2;
+      }
       return x < 0.01 ? 0.01 : x;
     }
 
@@ -214,7 +216,9 @@ class UsageService {
       final variance = v.map((x)=>(x-m)*(x-m)).reduce((a,b)=>a+b) / v.length;
       if (variance <= 0) return 1;
       double x = variance;
-      for (int i = 0; i < 30; i++) x = (x + variance/x) / 2;
+      for (int i = 0; i < 30; i++) {
+        x = (x + variance/x) / 2;
+      }
       return x.round().clamp(1, 999);
     }
 

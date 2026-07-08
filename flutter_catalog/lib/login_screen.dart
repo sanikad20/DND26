@@ -366,7 +366,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         Switch(
                           value: twoFAEnabled,
-                          activeColor: const Color(0xFF45199D),
+                          activeThumbColor: const Color(0xFF45199D),
                           onChanged: (val) {
                             setState(() {
                               twoFAEnabled = val;

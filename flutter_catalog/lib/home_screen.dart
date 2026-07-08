@@ -1,11 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'prediction_screen.dart';
 import 'continuous_monitoring_consent_screen.dart';
+import 'welcome_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final String name;
 
   const HomeScreen({super.key, required this.name});
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text('You will need to log in again to continue.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Log out'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await FirebaseAuth.instance.signOut();
+      if (!context.mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+        (route) => false,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +51,13 @@ class HomeScreen extends StatelessWidget {
           'BrainLag',
           style: TextStyle(color: Colors.black),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.black),
+            tooltip: 'Log out',
+            onPressed: () => _confirmLogout(context),
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(22),
