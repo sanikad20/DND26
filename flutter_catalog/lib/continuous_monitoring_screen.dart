@@ -288,12 +288,37 @@ class _ContinuousMonitoringScreenState
             Icon(Icons.health_and_safety_outlined,
                 color: Color(0xFF8A5CE6), size: 18),
             SizedBox(width: 8),
-            Text("Today's Burnout Score",
+            Text("Today's Burnout Score  (LSTM 7-day)",
                 style: TextStyle(color: Color(0xFF8A5CE6),
                     fontWeight: FontWeight.w700, fontSize: 14)),
           ]),
-          const SizedBox(height: 14),
-          _scoreBox('LSTM  (7-day)', _lstmScore, _lstmLevel),
+          const SizedBox(height: 16),
+          // Big score display
+          Center(
+            child: Column(children: [
+              Text(
+                _lstmScore != null ? '${_lstmScore!.toStringAsFixed(1)}/10' : '--',
+                style: TextStyle(
+                  color: _lstmScore != null ? _scoreColor(_lstmScore!) : Colors.white38,
+                  fontSize: 48, fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _levelColor(_lstmLevel).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: _levelColor(_lstmLevel).withOpacity(0.4)),
+                ),
+                child: Text(_lstmLevel,
+                    style: TextStyle(
+                        color: _levelColor(_lstmLevel),
+                        fontSize: 14, fontWeight: FontWeight.w600)),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 4),
           if (_todayVsBaseline != null) ...[
             const SizedBox(height: 14),
             const Divider(color: Colors.white12),
@@ -369,112 +394,138 @@ class _ContinuousMonitoringScreenState
     Color   color   = const Color(0xFF8A5CE6),
     double? threshY,
     double? avgY,
-  }) =>
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF232325),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white12),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: const TextStyle(
+  }) {
+    // Only show every other label when we have many points to avoid overlap
+    final showEvery = spots.length > 5 ? 2 : 1;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 16, 16, 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF232325),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: Text(title, style: const TextStyle(
               color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 14),
-          spots.isEmpty
-              ? const Center(child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Text('No data yet',
-                      style: TextStyle(color: Colors.white38))))
-              : SizedBox(
-                  height: 200,
-                  child: LineChart(LineChartData(
-                    minX: 0,
-                    maxX: (spots.length - 1).toDouble().clamp(1.0, 6.0),
-                    minY: 0, maxY: maxY,
-                    gridData: FlGridData(
-                      show: true, drawVerticalLine: false,
-                      getDrawingHorizontalLine: (_) =>
-                          const FlLine(color: Colors.white12, strokeWidth: 1),
-                    ),
-                    borderData: FlBorderData(show: false),
-                    extraLinesData: ExtraLinesData(horizontalLines: [
-                      if (threshY != null)
-                        HorizontalLine(
-                          y: threshY,
-                          color: Colors.orange.withOpacity(0.8),
-                          strokeWidth: 1.5, dashArray: [6, 4],
-                          label: HorizontalLineLabel(
-                            show: true, alignment: Alignment.topRight,
-                            labelResolver: (_) => 'threshold',
-                            style: const TextStyle(
-                                color: Colors.orange, fontSize: 9),
-                          ),
-                        ),
-                      if (avgY != null)
-                        HorizontalLine(
-                          y: avgY,
-                          color: Colors.green.withOpacity(0.6),
-                          strokeWidth: 1, dashArray: [4, 4],
-                          label: HorizontalLineLabel(
-                            show: true, alignment: Alignment.bottomRight,
-                            labelResolver: (_) => 'your avg',
-                            style: const TextStyle(
-                                color: Colors.green, fontSize: 9),
-                          ),
-                        ),
-                    ]),
-                    titlesData: FlTitlesData(
-                      rightTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false)),
-                      topTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false)),
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true, reservedSize: 32,
-                          getTitlesWidget: (v, _) => Text(
-                            isInt ? v.toInt().toString() : v.toStringAsFixed(1),
-                            style: const TextStyle(
-                                color: Colors.white38, fontSize: 9)),
-                        ),
-                      ),
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true, reservedSize: 22,
-                          getTitlesWidget: (v, _) {
-                            final i = v.toInt();
-                            if (i < 0 || i >= _history.length)
-                              return const SizedBox.shrink();
-                            final d = _history[i];
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                d.daysAgo == 0 ? 'Today' : d.dateLabel,
-                                style: const TextStyle(
-                                    color: Colors.white38, fontSize: 9)),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                    lineBarsData: [
-                      LineChartBarData(
-                        spots: spots, isCurved: true,
-                        color: color, barWidth: 2.5,
-                        dotData: FlDotData(
+        ),
+        const SizedBox(height: 14),
+        spots.isEmpty
+            ? const Center(child: Padding(
+                padding: EdgeInsets.all(20),
+                child: Text('No data yet',
+                    style: TextStyle(color: Colors.white38))))
+            : SizedBox(
+                height: 220,
+                child: LineChart(LineChartData(
+                  minX: 0,
+                  maxX: (spots.length - 1).toDouble().clamp(1.0, 7.0),
+                  minY: 0,
+                  maxY: maxY,
+                  clipData: const FlClipData.all(), // prevent line clipping
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: maxY / 4,
+                    getDrawingHorizontalLine: (_) =>
+                        const FlLine(color: Colors.white12, strokeWidth: 1),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  extraLinesData: ExtraLinesData(horizontalLines: [
+                    if (threshY != null && threshY <= maxY)
+                      HorizontalLine(
+                        y: threshY,
+                        color: Colors.orange.withOpacity(0.8),
+                        strokeWidth: 1.5, dashArray: [6, 4],
+                        label: HorizontalLineLabel(
                           show: true,
-                          getDotPainter: (s, _, __, ___) => FlDotCirclePainter(
-                            radius: 3, color: color,
-                            strokeWidth: 1, strokeColor: Colors.white24),
+                          alignment: Alignment.topRight,
+                          padding: const EdgeInsets.only(right: 4, bottom: 2),
+                          labelResolver: (_) => 'threshold',
+                          style: const TextStyle(
+                              color: Colors.orange, fontSize: 9),
                         ),
-                        belowBarData: BarAreaData(
-                            show: true, color: color.withOpacity(0.12)),
                       ),
-                    ],
-                  )),
-                ),
-        ]),
-      );
+                    if (avgY != null && avgY <= maxY)
+                      HorizontalLine(
+                        y: avgY,
+                        color: Colors.green.withOpacity(0.6),
+                        strokeWidth: 1, dashArray: [4, 4],
+                        label: HorizontalLineLabel(
+                          show: true,
+                          alignment: Alignment.bottomRight,
+                          padding: const EdgeInsets.only(right: 4, top: 2),
+                          labelResolver: (_) => 'your avg',
+                          style: const TextStyle(
+                              color: Colors.green, fontSize: 9),
+                        ),
+                      ),
+                  ]),
+                  titlesData: FlTitlesData(
+                    rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 36,
+                        interval: maxY / 4,
+                        getTitlesWidget: (v, _) => Text(
+                          isInt ? v.toInt().toString()
+                                : v.toStringAsFixed(1),
+                          style: const TextStyle(
+                              color: Colors.white38, fontSize: 9)),
+                      ),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 26,
+                        getTitlesWidget: (v, _) {
+                          final i = v.toInt();
+                          if (i < 0 || i >= _history.length)
+                            return const SizedBox.shrink();
+                          // Skip alternate labels to avoid overlap
+                          if (i % showEvery != 0 && i != 0)
+                            return const SizedBox.shrink();
+                          final d = _history[i];
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              d.daysAgo == 0 ? 'Today' : d.dateLabel,
+                              style: const TextStyle(
+                                  color: Colors.white38, fontSize: 9)),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: spots,
+                      isCurved: true,
+                      curveSmoothness: 0.3,
+                      color: color,
+                      barWidth: 2.5,
+                      isStrokeCapRound: true,
+                      dotData: FlDotData(
+                        show: true,
+                        getDotPainter: (s, _, __, ___) => FlDotCirclePainter(
+                          radius: 3.5, color: color,
+                          strokeWidth: 1.5, strokeColor: Colors.white24),
+                      ),
+                      belowBarData: BarAreaData(
+                          show: true, color: color.withOpacity(0.10)),
+                    ),
+                  ],
+                )),
+              ),
+      ]),
+    );
+  }
 
   Widget _baselineCard() {
     if (_baseline == null) return const SizedBox.shrink();
@@ -696,7 +747,10 @@ class _ContinuousMonitoringScreenState
 
             _chart(
               title: 'Screen Time  (hours)',
-              spots: screenSpots, maxY: screenSpots.isEmpty ? 16.0 : (screenSpots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.3).clamp(4.0, 24.0),
+              spots: screenSpots,
+              maxY: screenSpots.isEmpty ? 16.0
+                  : (screenSpots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.4)
+                      .clamp(4.0, 24.0),
               color: const Color(0xFF8A5CE6),
               threshY: b?.thresholdScreenTime,
               avgY:    b?.avgScreenTime,
@@ -704,7 +758,10 @@ class _ContinuousMonitoringScreenState
             const SizedBox(height: 14),
             _chart(
               title: 'App Switches / hr',
-              spots: switchSpots, maxY: 60,
+              spots: switchSpots,
+              maxY: switchSpots.isEmpty ? 80.0
+                  : (switchSpots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.4)
+                      .clamp(20.0, 120.0),
               isInt: true,
               color: Colors.tealAccent,
               threshY: b?.thresholdAppSwitches.toDouble(),
@@ -713,7 +770,10 @@ class _ContinuousMonitoringScreenState
             const SizedBox(height: 14),
             _chart(
               title: 'Social App Usage',
-              spots: socialSpots, maxY: socialSpots.isEmpty ? 1.0 : (socialSpots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.3).clamp(0.3, 1.0),
+              spots: socialSpots,
+              maxY: socialSpots.isEmpty ? 1.0
+                  : (socialSpots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.4)
+                      .clamp(0.5, 1.5),
               color: Colors.pinkAccent,
               threshY: b?.thresholdSocialRatio,
               avgY:    b?.avgSocialRatio,
