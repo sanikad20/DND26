@@ -12,6 +12,7 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   await ApiConfig.instance.init();  // ← ADD: loads saved URL before any screen opens
+ 
   runApp(const BrainLagApp());
 }
 
