@@ -10,6 +10,8 @@ from typing import List
 
 import tensorflow as tf
 
+from occupational import router as occupational_router
+
 app = FastAPI()
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -233,3 +235,12 @@ def predict_lstm(data: PersonalisedPredictInput):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Occupational Stress / Force Wellness (NEW, additive — Section 3 of plan)
+# Everything above this line is unchanged from the existing Digital Burnout
+# backend: /, /health, /predict, /predict_lstm all behave exactly as before.
+# ─────────────────────────────────────────────────────────────────────────────
+
+app.include_router(occupational_router)
