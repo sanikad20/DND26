@@ -31,3 +31,5 @@ env/
 
 # OS files
 .DS_Store
+Backend/.venv312/
+Backend/.venv/
