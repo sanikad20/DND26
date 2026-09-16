@@ -24,14 +24,51 @@ dependency, so it cannot change the behaviour of the existing
 """
 
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import List, Literal
 
+import joblib
+import numpy as np
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/occupational", tags=["Occupational Stress"])
 
-MODEL_VERSION = "placeholder-day1"  # bumped to a real model tag on Day 2
+MODEL_VERSION = "lr-day2-v1"  # real trained model, replaces Day-1 placeholder
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Day 2: load the trained Logistic Regression model + scaler + feature ranges.
+# Trained in train_occupational_stress.py on the Dryad police-stress dataset
+# (Garbarino & Magnavita, 2016), target = target_tertile (Low/Moderate/High).
+# CV accuracy 93.95% (+/-1.6%), held-out test accuracy 87.93%, macro-F1 0.879 —
+# outperformed Random Forest (82.7% CV / 77.6% test), so LR is the shipped model.
+# ─────────────────────────────────────────────────────────────────────────────
+_ARTIFACT_DIR = Path(__file__).parent
+_MODEL = joblib.load(_ARTIFACT_DIR / "occupational_lr_model.pkl")
+_SCALER = joblib.load(_ARTIFACT_DIR / "occupational_scaler.pkl")
+_FEATURE_ANCHORS = joblib.load(_ARTIFACT_DIR / "occupational_feature_anchors.pkl")
+_FEATURE_COLS = joblib.load(_ARTIFACT_DIR / "occupational_feature_cols.pkl")
+# _FEATURE_COLS order: ['demandmedia','controlmedia','supportmedia','effortmedia','rewardmedia']
+# _FEATURE_ANCHORS[feature] = (p5, p25, p50, p75, p95) of that feature in the
+# real Dryad training data — used as 5 anchor points for Likert 1..5, so a
+# "3" always lands on the population MEDIAN, not the middle of the raw
+# min/max range (which is skewed for e.g. rewardmedia and silently pushed a
+# neutral "all 3s" persona into a High reading during testing).
+
+# Score buckets (0-100) matching target_tertile, used only to place the
+# model's predicted probabilities on the same 0-100 scale the UI expects.
+_BUCKET_MIDPOINT = {"Low": 17, "Moderate": 50, "High": 83}
+
+
+def _likert_to_dcs_eri(value: int, feature: str) -> float:
+    """Map a 1-5 Likert answer onto the Dryad dataset's DCS/ERI scale for
+    that feature via piecewise-linear interpolation between 5 real
+    percentile anchors (p5/p25/p50/p75/p95), so the model only ever sees
+    values shaped like its real training distribution (Section 4.4)."""
+    p5, p25, p50, p75, p95 = _FEATURE_ANCHORS[feature]
+    anchor_x = [1, 2, 3, 4, 5]
+    anchor_y = [p5, p25, p50, p75, p95]
+    return float(np.interp(value, anchor_x, anchor_y))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -122,28 +159,37 @@ class HistoryResponse(BaseModel):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. Rule-based PLACEHOLDER scoring (Day 1 only — replaced by trained
-#    classifier on Day 2; route contract stays identical so nothing
-#    downstream has to change).
+# 3. Day 2: real trained-model scoring, wired into the same route contract
+#    the Day-1 placeholder used (Section 6.1: model layer sets base score +
+#    risk class, context layer only nudges by a capped, cited amount).
 # ─────────────────────────────────────────────────────────────────────────────
 
-def score_with_placeholder_rules(a: OccupationalAnswers) -> AssessmentResult:
-    # --- Model-layer placeholder: simple weighted average of the 5
-    #     DCS/ERI Likert answers, standing in for the Day-2 trained model.
-    #     High demand/effort push the score up; high control/support/reward
-    #     pull it down — same directionality the real model is expected to learn.
-    model_raw = (
-        a.demand * 1.0
-        + a.effort * 1.0
-        - a.control * 1.0
-        - a.support * 1.0
-        - a.reward * 1.0
-    )
-    # model_raw ranges roughly [-15, 15] -> rescale to 0-100
-    base_score = ((model_raw + 15) / 30) * 100
+def score_with_trained_model(a: OccupationalAnswers) -> AssessmentResult:
+    # --- Model layer: the 5 [MODEL] Likert answers -> DCS/ERI scale ->
+    #     trained Logistic Regression (93.95% CV accuracy) -> risk class
+    #     + probability-weighted score.
+    likert_by_feature = {
+        "demandmedia": a.demand,
+        "controlmedia": a.control,
+        "supportmedia": a.support,
+        "effortmedia": a.effort,
+        "rewardmedia": a.reward,
+    }
+    x_raw = np.array([[_likert_to_dcs_eri(likert_by_feature[f], f) for f in _FEATURE_COLS]])
+    x_scaled = _SCALER.transform(x_raw)
+
+    predicted_class = _MODEL.predict(x_scaled)[0]  # risk LABEL always comes from the model (Section 6.1)
+    proba = dict(zip(_MODEL.classes_, _MODEL.predict_proba(x_scaled)[0]))
+
+    # Probability-weighted score keeps the 0-100 scale smooth/explainable
+    # instead of a flat midpoint, while the risk_level below stays the
+    # model's own argmax class — never re-derived from this score.
+    base_score = sum(proba[cls] * _BUCKET_MIDPOINT[cls] for cls in proba)
     base_score = max(0.0, min(100.0, base_score))
 
-    # --- Context-layer placeholder: capped +/-15 nudge (Section 6.1),
+    risk_level = predicted_class  # "Low" | "Moderate" | "High" — from the model, not recomputed
+
+    # --- Context layer: capped +/-15 nudge (Section 6.1),
     #     never allowed to flip a confidently-Low result into High.
     nudge = 0.0
     if a.duty_hours_per_day >= 12:
@@ -160,14 +206,13 @@ def score_with_placeholder_rules(a: OccupationalAnswers) -> AssessmentResult:
         nudge += 2
     nudge = max(-15.0, min(15.0, nudge))
 
-    score = int(round(max(0.0, min(100.0, base_score + nudge))))
-
-    if score < 34:
-        risk_level = "Low"
-    elif score < 67:
-        risk_level = "Moderate"
-    else:
-        risk_level = "High"
+    nudged_score = base_score + nudge
+    if risk_level == "Low":
+        # Hard rule (Section 6.1): context layer can never flip a
+        # confidently-Low model result into High — cap the display score
+        # so it can visually read as Moderate-at-most, never High.
+        nudged_score = min(nudged_score, 66.0)
+    score = int(round(max(0.0, min(100.0, nudged_score))))
 
     model_contributors = []
     if a.demand >= 4:
@@ -202,7 +247,7 @@ def score_with_placeholder_rules(a: OccupationalAnswers) -> AssessmentResult:
         context_contributors=context_contributors,
         protective_factors=protective_factors,
         model_version=MODEL_VERSION,
-        placeholder_scoring=True,
+        placeholder_scoring=False,
         generated_at=datetime.utcnow().isoformat(),
     )
 
@@ -218,10 +263,10 @@ def get_questionnaire():
 
 @router.post("/assess", response_model=AssessmentResult)
 def assess(answers: OccupationalAnswers):
-    # NOTE: Day 1 does not persist this record — persistence + real /history
-    # trend computation is added Day 4 (Section 8: occupational_assessments
-    # table, keyed only by firebase_uid, no name/email/rank).
-    return score_with_placeholder_rules(answers)
+    # NOTE: persistence + real /history trend computation is added Day 4
+    # (Section 8: occupational_assessments table, keyed only by firebase_uid,
+    # no name/email/rank). Scoring is now the real trained model (Day 2).
+    return score_with_trained_model(answers)
 
 
 @router.get("/history/{firebase_uid}", response_model=HistoryResponse)

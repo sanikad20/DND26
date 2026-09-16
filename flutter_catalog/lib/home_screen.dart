@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'prediction_screen.dart';
 import 'continuous_monitoring_consent_screen.dart';
 import 'welcome_screen.dart';
+import 'occupational_stress_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final String name;
@@ -193,6 +194,25 @@ class HomeScreen extends StatelessWidget {
                     MaterialPageRoute(
                         builder: (_) => const ContinuousMonitoringConsentScreen())),
                 child: const Text('Continuous Monitoring',
+                    style: TextStyle(color: Color(0xFF45199D), fontSize: 16)),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFF45199D), width: 1.5),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: () => Navigator.push(context,
+                    MaterialPageRoute(
+                        builder: (_) => OccupationalStressScreen())),
+                child: const Text('Occupational Stress',
                     style: TextStyle(color: Color(0xFF45199D), fontSize: 16)),
               ),
             ),
