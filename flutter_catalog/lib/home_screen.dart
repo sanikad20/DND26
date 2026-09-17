@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'prediction_screen.dart';
 import 'continuous_monitoring_consent_screen.dart';
 import 'welcome_screen.dart';
-import 'occupational_stress_screen.dart';
+import 'occupational_wellness_dashboard.dart';
 
 class HomeScreen extends StatelessWidget {
   final String name;
@@ -18,12 +18,16 @@ class HomeScreen extends StatelessWidget {
 
     // If it looks like an email, extract the local part
     if (n.contains('@')) {
-      n = n.split('@').first;          // "sanika20deshmukh"
+      n = n.split('@').first; // "sanika20deshmukh"
       n = n.replaceAll(RegExp(r'[0-9]'), ''); // "sanikadesmukh"
       // Split on common separators and take first part
-      n = n.split(RegExp(r'[._\-]')).first; // "sanikadesmukh" (no separator here)
+      n = n
+          .split(RegExp(r'[._\-]'))
+          .first; // "sanikadesmukh" (no separator here)
       // Capitalize first letter only
-      return n.isEmpty ? 'there' : n[0].toUpperCase() + n.substring(1).toLowerCase();
+      return n.isEmpty
+          ? 'there'
+          : n[0].toUpperCase() + n.substring(1).toLowerCase();
     }
 
     // It's a display name — take first word
@@ -68,8 +72,7 @@ class HomeScreen extends StatelessWidget {
         backgroundColor: const Color(0xFFF3F3F3),
         elevation: 0,
         automaticallyImplyLeading: false,
-        title: const Text('BrainLag',
-            style: TextStyle(color: Colors.black)),
+        title: const Text('BrainLag', style: TextStyle(color: Colors.black)),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.black),
@@ -85,8 +88,7 @@ class HomeScreen extends StatelessWidget {
           children: [
             Text(
               'Hello, $_firstName 👋',
-              style: const TextStyle(
-                  fontSize: 28, fontWeight: FontWeight.w700),
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -107,11 +109,14 @@ class HomeScreen extends StatelessWidget {
               child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Burnout Monitoring',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700)),
+                  Text(
+                    'Burnout Monitoring',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   SizedBox(height: 8),
                   Text(
                     'Use manual input or enable continuous monitoring for habit-based burnout detection.',
@@ -127,18 +132,21 @@ class HomeScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20)),
-              child: const Row(children: [
-                Icon(Icons.privacy_tip_outlined, color: Color(0xFF45199D)),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Privacy-first design: monitoring starts only after user consent.',
-                    style: TextStyle(fontSize: 15),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.privacy_tip_outlined, color: Color(0xFF45199D)),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Privacy-first design: monitoring starts only after user consent.',
+                      style: TextStyle(fontSize: 15),
+                    ),
                   ),
-                ),
-              ]),
+                ],
+              ),
             ),
 
             const SizedBox(height: 18),
@@ -147,18 +155,21 @@ class HomeScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20)),
-              child: const Row(children: [
-                Icon(Icons.analytics_outlined, color: Color(0xFF45199D)),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Manual mode uses entered values, while continuous mode uses collected behavioral summaries.',
-                    style: TextStyle(fontSize: 15),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.analytics_outlined, color: Color(0xFF45199D)),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Manual mode uses entered values, while continuous mode uses collected behavioral summaries.',
+                      style: TextStyle(fontSize: 15),
+                    ),
                   ),
-                ),
-              ]),
+                ],
+              ),
             ),
 
             const Spacer(),
@@ -170,12 +181,17 @@ class HomeScreen extends StatelessWidget {
                   backgroundColor: const Color(0xFF45199D),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
-                onPressed: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const PredictionScreen())),
-                child: const Text('Manual Mode',
-                    style: TextStyle(color: Colors.white, fontSize: 16)),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PredictionScreen()),
+                ),
+                child: const Text(
+                  'Manual Mode',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
               ),
             ),
 
@@ -188,13 +204,19 @@ class HomeScreen extends StatelessWidget {
                   side: const BorderSide(color: Color(0xFF45199D), width: 1.5),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
-                onPressed: () => Navigator.push(context,
-                    MaterialPageRoute(
-                        builder: (_) => const ContinuousMonitoringConsentScreen())),
-                child: const Text('Continuous Monitoring',
-                    style: TextStyle(color: Color(0xFF45199D), fontSize: 16)),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ContinuousMonitoringConsentScreen(),
+                  ),
+                ),
+                child: const Text(
+                  'Continuous Monitoring',
+                  style: TextStyle(color: Color(0xFF45199D), fontSize: 16),
+                ),
               ),
             ),
 
@@ -207,13 +229,19 @@ class HomeScreen extends StatelessWidget {
                   side: const BorderSide(color: Color(0xFF45199D), width: 1.5),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
-                onPressed: () => Navigator.push(context,
-                    MaterialPageRoute(
-                        builder: (_) => OccupationalStressScreen())),
-                child: const Text('Occupational Stress',
-                    style: TextStyle(color: Color(0xFF45199D), fontSize: 16)),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const OccupationalWellnessDashboard(),
+                  ),
+                ),
+                child: const Text(
+                  'Occupational Wellness',
+                  style: TextStyle(color: Color(0xFF45199D), fontSize: 16),
+                ),
               ),
             ),
           ],
