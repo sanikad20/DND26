@@ -135,6 +135,8 @@ class OccupationalFactor {
     }
     return OccupationalFactor(label: value.toString(), layer: '');
   }
+
+  Map<String, dynamic> toJson() => {'label': label, 'layer': layer};
 }
 
 class OccupationalAssessmentResult {
@@ -182,6 +184,21 @@ class OccupationalAssessmentResult {
           DateTime.now(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'risk_level': riskLevel,
+    'score': score,
+    'model_contributors': modelContributors
+        .map((item) => item.toJson())
+        .toList(),
+    'context_contributors': contextContributors
+        .map((item) => item.toJson())
+        .toList(),
+    'protective_factors': protectiveFactors,
+    'model_version': modelVersion,
+    'placeholder_scoring': placeholderScoring,
+    'generated_at': generatedAt.toIso8601String(),
+  };
 
   List<String> get contributorLabels => [
     ...modelContributors.map((item) => item.label),

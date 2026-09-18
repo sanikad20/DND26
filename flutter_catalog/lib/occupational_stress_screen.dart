@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'config/api_config.dart';
+import 'occupational_wellness_plan.dart';
 
 class OccupationalStressScreen extends StatefulWidget {
   final ValueChanged<OccupationalAssessmentResult>? onAssessmentComplete;
@@ -20,7 +21,6 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
       'PTSD, or any medical or psychological condition.';
 
   bool _isLoading = false;
-  bool _planStarted = false;
   String? _errorText;
 
   double dutyHoursPerDay = 8;
@@ -38,7 +38,25 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
   double reward = 3;
 
   OccupationalAssessmentResult? _result;
-  final Set<int> _completedPlanDays = {};
+  final OccupationalPlanProgress _planProgress =
+      OccupationalPlanProgress.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _planProgress.addListener(_refreshPlanState);
+    _planProgress.load();
+  }
+
+  @override
+  void dispose() {
+    _planProgress.removeListener(_refreshPlanState);
+    super.dispose();
+  }
+
+  void _refreshPlanState() {
+    if (mounted) setState(() {});
+  }
 
   bool get _hasResult => _result != null;
 
@@ -76,11 +94,14 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
     try {
       final assessment = await ApiService.instance.assessOccupational(answers);
       if (!mounted) return;
+      await OccupationalAssessmentStore.instance.saveLatestAssessment(
+        assessment,
+      );
+      await _planProgress.resetForNewAssessment();
+      if (!mounted) return;
       widget.onAssessmentComplete?.call(assessment);
       setState(() {
         _result = assessment;
-        _planStarted = false;
-        _completedPlanDays.clear();
       });
     } catch (e) {
       if (!mounted) return;
@@ -136,13 +157,20 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
       reward = 3;
       _result = null;
       _errorText = null;
-      _planStarted = false;
-      _completedPlanDays.clear();
     });
   }
 
   void _returnToDashboard() {
     Navigator.pop(context, _result);
+  }
+
+  Future<void> _openPlan() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OccupationalWellnessPlanScreen(assessment: _result),
+      ),
+    );
   }
 
   Color _riskColor(String? riskLevel) {
@@ -280,75 +308,11 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
     return recommendations.take(5).toList();
   }
 
-  List<WellnessPlanDay> _planDays() {
-    final result = _result;
-    final contributors =
-        result?.contributorLabels.join(' ').toLowerCase() ?? '';
-    final recoveryFocus =
-        contributors.contains('recovery') ||
-        contributors.contains('night') ||
-        contributors.contains('long duty');
-    final supportFocus =
-        contributors.contains('support') || contributors.contains('family');
-    final workloadFocus =
-        contributors.contains('workload') ||
-        contributors.contains('control') ||
-        contributors.contains('effort');
-
-    return [
-      WellnessPlanDay(
-        day: 1,
-        title: 'Recovery check',
-        body: recoveryFocus
-            ? 'Write down when you can realistically get your next protected rest block.'
-            : 'Take a two-minute check on sleep, hydration, and energy before the next duty block.',
-      ),
-      const WellnessPlanDay(
-        day: 2,
-        title: 'Sleep routine',
-        body:
-            'Keep one consistent pre-sleep cue today, such as dim light, reduced phone use, or a fixed wind-down time.',
-      ),
-      const WellnessPlanDay(
-        day: 3,
-        title: 'Movement',
-        body:
-            'Complete a short walk, mobility session, or light physical activity that fits your schedule.',
-      ),
-      WellnessPlanDay(
-        day: 4,
-        title: 'Connection',
-        body: supportFocus
-            ? 'Check in with a trusted peer, family member, or appropriate support contact.'
-            : 'Spend a short intentional window with family, peers, or trusted support.',
-      ),
-      WellnessPlanDay(
-        day: 5,
-        title: 'Workload reflection',
-        body: workloadFocus
-            ? 'Identify one workload pressure that can be clarified, sequenced, or discussed.'
-            : 'Note one thing that made duty easier this week and one thing to adjust.',
-      ),
-      const WellnessPlanDay(
-        day: 6,
-        title: 'Relaxation',
-        body:
-            'Complete a brief breathing, stretching, prayer, mindfulness, or quiet decompression activity.',
-      ),
-      const WellnessPlanDay(
-        day: 7,
-        title: 'Reflect and reassess',
-        body:
-            'Review the week and consider taking another assessment to compare your current indicators.',
-      ),
-    ];
-  }
-
   @override
   Widget build(BuildContext context) {
     final result = _result;
     final recommendations = _recommendations();
-    final planDays = _planDays();
+    final planDays = buildOccupationalPlanDays(result);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0F),
@@ -459,19 +423,12 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
                     _RecommendationsPanel(items: recommendations),
                     const SizedBox(height: 18),
                     _WellnessPlanPanel(
-                      started: _planStarted,
-                      completedDays: _completedPlanDays,
+                      started: _planProgress.started,
+                      completedDays: _planProgress.completedDays,
                       days: planDays,
-                      onStart: () => setState(() => _planStarted = true),
-                      onToggleDay: (day, selected) {
-                        setState(() {
-                          if (selected) {
-                            _completedPlanDays.add(day);
-                          } else {
-                            _completedPlanDays.remove(day);
-                          }
-                        });
-                      },
+                      onStart: _planProgress.start,
+                      onOpenPlan: _openPlan,
+                      onToggleDay: _planProgress.setDayCompleted,
                     ),
                   ],
                   const SizedBox(height: 18),
@@ -493,18 +450,6 @@ class WellnessRecommendation {
 
   const WellnessRecommendation({
     required this.icon,
-    required this.title,
-    required this.body,
-  });
-}
-
-class WellnessPlanDay {
-  final int day;
-  final String title;
-  final String body;
-
-  const WellnessPlanDay({
-    required this.day,
     required this.title,
     required this.body,
   });
@@ -1007,15 +952,17 @@ class _RecommendationsPanel extends StatelessWidget {
 class _WellnessPlanPanel extends StatelessWidget {
   final bool started;
   final Set<int> completedDays;
-  final List<WellnessPlanDay> days;
-  final VoidCallback onStart;
-  final void Function(int day, bool selected) onToggleDay;
+  final List<OccupationalPlanDay> days;
+  final Future<void> Function() onStart;
+  final VoidCallback onOpenPlan;
+  final Future<void> Function(int day, bool selected) onToggleDay;
 
   const _WellnessPlanPanel({
     required this.started,
     required this.completedDays,
     required this.days,
     required this.onStart,
+    required this.onOpenPlan,
     required this.onToggleDay,
   });
 
@@ -1066,6 +1013,25 @@ class _WellnessPlanPanel extends StatelessWidget {
             ),
             const SizedBox(height: 14),
           ],
+          if (started) ...[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onOpenPlan,
+                icon: const Icon(Icons.open_in_new),
+                label: const Text('Open Full Plan'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white24),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
           LayoutBuilder(
             builder: (context, constraints) {
               final twoColumns = constraints.maxWidth >= 760;
@@ -1078,7 +1044,7 @@ class _WellnessPlanPanel extends StatelessWidget {
                         width: twoColumns
                             ? (constraints.maxWidth - 14) / 2
                             : constraints.maxWidth,
-                        child: _WellnessDayCard(
+                        child: OccupationalPlanDayCard(
                           day: day,
                           enabled: started,
                           completed: completedDays.contains(day.day),
@@ -1632,71 +1598,6 @@ class _RecommendationCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _WellnessDayCard extends StatelessWidget {
-  final WellnessPlanDay day;
-  final bool enabled;
-  final bool completed;
-  final ValueChanged<bool?> onChanged;
-
-  const _WellnessDayCard({
-    required this.day,
-    required this.enabled,
-    required this.completed,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedOpacity(
-      opacity: enabled ? 1 : 0.58,
-      duration: const Duration(milliseconds: 160),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: completed ? const Color(0xFF10251E) : const Color(0xFF101116),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: completed
-                ? const Color(0xFF3DDC97).withValues(alpha: 0.45)
-                : Colors.white10,
-          ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Checkbox(
-              value: completed,
-              onChanged: enabled ? onChanged : null,
-              activeColor: const Color(0xFF3DDC97),
-              side: const BorderSide(color: Colors.white38),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Day ${day.day}  |  ${day.title}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    day.body,
-                    style: const TextStyle(color: Colors.white60, height: 1.4),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

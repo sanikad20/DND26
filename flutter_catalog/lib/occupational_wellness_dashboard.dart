@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'occupational_stress_screen.dart';
+import 'occupational_wellness_plan.dart';
 
 class OccupationalWellnessDashboard extends StatefulWidget {
   const OccupationalWellnessDashboard({super.key});
@@ -13,7 +14,33 @@ class OccupationalWellnessDashboard extends StatefulWidget {
 class _OccupationalWellnessDashboardState
     extends State<OccupationalWellnessDashboard> {
   OccupationalAssessmentResult? _latestAssessment;
-  final int _completedPlanDays = 0;
+  final OccupationalPlanProgress _planProgress =
+      OccupationalPlanProgress.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _planProgress.addListener(_refreshPlanState);
+    _loadLocalState();
+  }
+
+  @override
+  void dispose() {
+    _planProgress.removeListener(_refreshPlanState);
+    super.dispose();
+  }
+
+  Future<void> _loadLocalState() async {
+    final assessment = await OccupationalAssessmentStore.instance
+        .loadLatestAssessment();
+    await _planProgress.load();
+    if (!mounted) return;
+    setState(() => _latestAssessment = assessment);
+  }
+
+  void _refreshPlanState() {
+    if (mounted) setState(() {});
+  }
 
   Future<void> _openAssessment() async {
     final result = await Navigator.push<OccupationalAssessmentResult>(
@@ -30,6 +57,16 @@ class _OccupationalWellnessDashboardState
     if (result != null && mounted) {
       setState(() => _latestAssessment = result);
     }
+  }
+
+  Future<void> _openPlan() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            OccupationalWellnessPlanScreen(assessment: _latestAssessment),
+      ),
+    );
   }
 
   Color _riskColor(String? level) {
@@ -166,8 +203,9 @@ class _OccupationalWellnessDashboardState
                       final plan = _DashboardPanel(
                         title: '7-day plan',
                         child: _PlanSummary(
-                          completed: _completedPlanDays,
-                          onContinue: _openAssessment,
+                          completed: _planProgress.completedCount,
+                          started: _planProgress.started,
+                          onContinue: _openPlan,
                         ),
                       );
                       if (!wide) {
@@ -191,7 +229,7 @@ class _OccupationalWellnessDashboardState
                   ),
                   const SizedBox(height: 16),
                   _DashboardPanel(
-                    title: 'History and trends',
+                    title: 'Day 4 history',
                     child: _HistoryEmptyState(hasLatest: result != null),
                   ),
                 ],
@@ -444,9 +482,14 @@ class _InsightRow extends StatelessWidget {
 
 class _PlanSummary extends StatelessWidget {
   final int completed;
+  final bool started;
   final VoidCallback onContinue;
 
-  const _PlanSummary({required this.completed, required this.onContinue});
+  const _PlanSummary({
+    required this.completed,
+    required this.started,
+    required this.onContinue,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -464,6 +507,13 @@ class _PlanSummary extends StatelessWidget {
         Text(
           '$completed / 7 completed',
           style: const TextStyle(color: Colors.white70),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          started
+              ? 'Continue the same local plan from your latest assessment.'
+              : 'Start the plan after your assessment, then mark each day complete.',
+          style: const TextStyle(color: Colors.white54, height: 1.35),
         ),
         const SizedBox(height: 16),
         SizedBox(
@@ -510,8 +560,8 @@ class _HistoryEmptyState extends StatelessWidget {
           Expanded(
             child: Text(
               hasLatest
-                  ? 'Latest assessment is shown above. Complete more assessments to see your wellness trend.'
-                  : 'No previous assessments yet. Complete an assessment to begin your wellness history.',
+                  ? 'Latest assessment is shown above. Database-backed history and trends are reserved for Day 4.'
+                  : 'No assessment history is stored in Day 3. Complete an assessment to view the current result and plan only.',
               style: const TextStyle(color: Colors.white60, height: 1.4),
             ),
           ),
