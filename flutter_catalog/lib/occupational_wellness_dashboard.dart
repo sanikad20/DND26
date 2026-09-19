@@ -116,6 +116,12 @@ class _OccupationalWellnessDashboardState
     if (labels.contains('support')) {
       return 'Consider a practical check-in with a trusted peer or supervisor for support around current duty pressure.';
     }
+    if (labels.contains('family') || labels.contains('social')) {
+      return 'Protect a short connection window with family, loved ones, or a trusted peer this week.';
+    }
+    if (labels.contains('control')) {
+      return 'Pick one flexible part of the next duty block that can be clarified, sequenced, or simplified.';
+    }
     if (result.riskLevel == 'Low') {
       return 'Maintain your current protective routines and reassess next week.';
     }

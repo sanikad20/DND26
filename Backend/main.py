@@ -11,12 +11,13 @@ from typing import List
 
 import tensorflow as tf
 
-from occupational import router as occupational_router
+from api.routes.occupational import router as occupational_router
+from core.config import settings
 
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -78,13 +79,13 @@ class BurnoutModel(nn.Module):
     def forward(self, x):
         return self.net(x).squeeze(-1)
 
-with open("manual_feature_cols.pkl", "rb") as f:
+with open(settings.manual_feature_cols_path, "rb") as f:
     manual_feature_cols = pickle.load(f)
 
-manual_scaler = joblib.load("burnout_scaler.pkl")
+manual_scaler = joblib.load(settings.burnout_scaler_path)
 manual_model  = BurnoutModel(n_features=len(manual_feature_cols))
 manual_model.load_state_dict(
-    torch.load("best_burnout_model.pt", map_location="cpu", weights_only=True))
+    torch.load(settings.burnout_model_path, map_location="cpu", weights_only=True))
 manual_model.eval()
 
 
@@ -92,15 +93,15 @@ manual_model.eval()
 # Load Personalised LSTM
 # ─────────────────────────────────────────────────────────────────────────────
 
-_lstm_saved    = tf.saved_model.load("burnout_lstm_savedmodel")
+_lstm_saved    = tf.saved_model.load(str(settings.lstm_saved_model_path))
 _lstm_infer    = _lstm_saved.signatures["serving_default"]
 _output_key    = list(_lstm_infer.structured_outputs.keys())[0]
 
-day_scaler     = joblib.load("lstm_day_scaler.pkl")
-today_scaler   = joblib.load("lstm_today_scaler.pkl")
-DAY_FEATURES   = joblib.load("lstm_day_features.pkl")
-TODAY_FEATURES = joblib.load("lstm_today_features.pkl")
-SEQ_LEN        = joblib.load("lstm_seq_len.pkl")
+day_scaler     = joblib.load(settings.lstm_day_scaler_path)
+today_scaler   = joblib.load(settings.lstm_today_scaler_path)
+DAY_FEATURES   = joblib.load(settings.lstm_day_features_path)
+TODAY_FEATURES = joblib.load(settings.lstm_today_features_path)
+SEQ_LEN        = joblib.load(settings.lstm_seq_len_path)
 
 print(f"LSTM loaded ✓  |  seq_len={SEQ_LEN}  |  output key: '{_output_key}'")
 

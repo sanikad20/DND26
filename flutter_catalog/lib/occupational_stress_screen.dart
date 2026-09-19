@@ -240,6 +240,16 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
         ),
       );
     }
+    if (has('family') || has('social')) {
+      recommendations.add(
+        const WellnessRecommendation(
+          icon: Icons.family_restroom_outlined,
+          title: 'Protect connection time',
+          body:
+              'Block a small realistic window for family, loved ones, or trusted social contact, even if it has to be brief.',
+        ),
+      );
+    }
     if (has('effort-reward')) {
       recommendations.add(
         const WellnessRecommendation(

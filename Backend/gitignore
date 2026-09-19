@@ -1,5 +1,6 @@
 # Python
 __pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 *.pyd
@@ -15,6 +16,7 @@ env/
 
 # Database (don't commit — Render uses its own)
 *.db
+users.db
 *.sqlite3
 
 # Environment variables
@@ -24,6 +26,7 @@ env/
 # IDE
 .vscode/
 .idea/
+*.iml
 
 # OS
 .DS_Store
