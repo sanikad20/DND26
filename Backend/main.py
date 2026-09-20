@@ -13,8 +13,15 @@ import tensorflow as tf
 
 from api.routes.occupational import router as occupational_router
 from core.config import settings
+from database import Base, engine
+import models  # noqa: F401 — registers User + OccupationalAssessment on Base
 
 app = FastAPI()
+
+# Creates any tables that don't exist yet (users, occupational_assessments).
+# Safe to call on every startup — no-ops for tables that already exist.
+Base.metadata.create_all(bind=engine)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
