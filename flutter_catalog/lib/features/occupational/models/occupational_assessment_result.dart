@@ -1,3 +1,5 @@
+import 'occupational_plan_day.dart';
+
 class OccupationalFactor {
   final String label;
   final String layer;
@@ -17,6 +19,24 @@ class OccupationalFactor {
   Map<String, dynamic> toJson() => {'label': label, 'layer': layer};
 }
 
+/// A recommendation from the backend, tied to the contributor that
+/// triggered it (e.g. label "High workload").
+class OccupationalRecommendation {
+  final String label;
+  final String text;
+
+  const OccupationalRecommendation({required this.label, required this.text});
+
+  factory OccupationalRecommendation.fromJson(Map<String, dynamic> data) {
+    return OccupationalRecommendation(
+      label: data['label']?.toString() ?? '',
+      text: data['text']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {'label': label, 'text': text};
+}
+
 class OccupationalAssessmentResult {
   final String riskLevel;
   final int score;
@@ -27,6 +47,11 @@ class OccupationalAssessmentResult {
   final bool placeholderScoring;
   final DateTime generatedAt;
 
+  /// Recommendations and plan come from the backend (single source of truth).
+  /// Empty for assessments saved by an older app version.
+  final List<OccupationalRecommendation> recommendationItems;
+  final List<OccupationalPlanDay> plan;
+
   const OccupationalAssessmentResult({
     required this.riskLevel,
     required this.score,
@@ -36,6 +61,8 @@ class OccupationalAssessmentResult {
     required this.modelVersion,
     required this.placeholderScoring,
     required this.generatedAt,
+    this.recommendationItems = const [],
+    this.plan = const [],
   });
 
   factory OccupationalAssessmentResult.fromJson(Map<String, dynamic> data) {
@@ -47,6 +74,24 @@ class OccupationalAssessmentResult {
         .toList();
     final protectiveItems = (data['protective_factors'] as List<dynamic>? ?? [])
         .map((item) => item.toString())
+        .toList();
+    final recommendationItems =
+        (data['recommendation_items'] as List<dynamic>? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .map(OccupationalRecommendation.fromJson)
+            .toList();
+    final planItems = (data['plan'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(
+          (item) => OccupationalPlanDay(
+            day: int.tryParse(item['day'].toString()) ?? 0,
+            title: item['title']?.toString() ?? '',
+            explanation: item['detail']?.toString() ?? '',
+            tasks: (item['tasks'] as List<dynamic>? ?? [])
+                .map((task) => task.toString())
+                .toList(),
+          ),
+        )
         .toList();
 
     return OccupationalAssessmentResult(
@@ -60,6 +105,8 @@ class OccupationalAssessmentResult {
       generatedAt:
           DateTime.tryParse(data['generated_at']?.toString() ?? '') ??
           DateTime.now(),
+      recommendationItems: recommendationItems,
+      plan: planItems,
     );
   }
 
@@ -76,6 +123,19 @@ class OccupationalAssessmentResult {
     'model_version': modelVersion,
     'placeholder_scoring': placeholderScoring,
     'generated_at': generatedAt.toIso8601String(),
+    'recommendation_items': recommendationItems
+        .map((item) => item.toJson())
+        .toList(),
+    'plan': plan
+        .map(
+          (day) => {
+            'day': day.day,
+            'title': day.title,
+            'detail': day.explanation,
+            'tasks': day.tasks,
+          },
+        )
+        .toList(),
   };
 
   List<String> get contributorLabels => [

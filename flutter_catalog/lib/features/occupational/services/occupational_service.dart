@@ -20,6 +20,26 @@ class OccupationalService {
     return OccupationalAssessmentResult.fromJson(data);
   }
 
+  /// Question wording from the server, keyed by question number (1-12), so
+  /// wording can be edited without an app release.
+  Future<Map<int, String>> getQuestionTexts() async {
+    final data = await _apiClient.getJson(
+      '/occupational/questionnaire',
+      timeout: const Duration(seconds: 15),
+    );
+    final texts = <int, String>{};
+    for (final item in (data['questions'] as List<dynamic>? ?? [])) {
+      if (item is Map<String, dynamic>) {
+        final id = int.tryParse(item['id'].toString());
+        final text = item['text']?.toString();
+        if (id != null && text != null && text.isNotEmpty) {
+          texts[id] = text;
+        }
+      }
+    }
+    return texts;
+  }
+
   Future<OccupationalHistory> getHistory(String firebaseUid) async {
     final data = await _apiClient.getJson(
       '/occupational/history/$firebaseUid',

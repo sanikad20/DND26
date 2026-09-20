@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'api_service.dart';
+import 'features/burnout/state/burnout_history_store.dart';
 import 'occupational_consent_screen.dart';
 import 'occupational_wellness_plan.dart';
 
@@ -23,12 +24,22 @@ class _OccupationalWellnessDashboardState
   bool _historyLoading = true;
   String? _historyError;
 
+  // Digital Burnout scores saved on this device by Manual / Continuous mode.
+  List<BurnoutHistoryPoint> _burnoutHistory = const [];
+
   @override
   void initState() {
     super.initState();
     _planProgress.addListener(_refreshPlanState);
     _loadLocalState();
+    _loadBurnoutHistory();
     _loadHistory();
+  }
+
+  Future<void> _loadBurnoutHistory() async {
+    final points = await BurnoutHistoryStore.instance.load();
+    if (!mounted) return;
+    setState(() => _burnoutHistory = points);
   }
 
   @override
@@ -145,6 +156,9 @@ class _OccupationalWellnessDashboardState
     if (result == null) {
       return 'Complete an assessment to receive a focused recommendation.';
     }
+    if (result.recommendationItems.isNotEmpty) {
+      return result.recommendationItems.first.text;
+    }
     final labels = result.contributorLabels.join(' ').toLowerCase();
     if (labels.contains('recovery')) {
       return 'Prioritize a short recovery window after duty and track whether rest improves this week.';
@@ -179,7 +193,7 @@ class _OccupationalWellnessDashboardState
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
-          'Occupational Wellness',
+          'Wellness Dashboard',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
       ),
@@ -197,6 +211,14 @@ class _OccupationalWellnessDashboardState
                     style: TextStyle(color: Colors.white60, fontSize: 15),
                   ),
                   const SizedBox(height: 22),
+                  _DashboardPanel(
+                    title: 'Trends at a glance',
+                    child: _TrendsAtAGlance(
+                      burnout: _burnoutHistory,
+                      occupational: _history,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final wide = constraints.maxWidth >= 860;
@@ -245,9 +267,11 @@ class _OccupationalWellnessDashboardState
                         title: 'Quick insights',
                         child: _InsightList(result: result),
                       );
+                      final planTotal = buildOccupationalPlanDays(result).length;
                       final plan = _DashboardPanel(
-                        title: '7-day plan',
+                        title: planTotal < 7 ? 'Maintain plan' : '7-day plan',
                         child: _PlanSummary(
+                          total: planTotal,
                           completed: _planProgress.completedCount,
                           started: _planProgress.started,
                           onContinue: _openPlan,
@@ -531,11 +555,13 @@ class _InsightRow extends StatelessWidget {
 }
 
 class _PlanSummary extends StatelessWidget {
+  final int total;
   final int completed;
   final bool started;
   final VoidCallback onContinue;
 
   const _PlanSummary({
+    required this.total,
     required this.completed,
     required this.started,
     required this.onContinue,
@@ -547,7 +573,7 @@ class _PlanSummary extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         LinearProgressIndicator(
-          value: completed / 7,
+          value: completed / total,
           minHeight: 8,
           borderRadius: BorderRadius.circular(20),
           backgroundColor: Colors.white10,
@@ -555,7 +581,7 @@ class _PlanSummary extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Text(
-          '$completed / 7 completed',
+          '$completed / $total completed',
           style: const TextStyle(color: Colors.white70),
         ),
         const SizedBox(height: 6),
@@ -743,7 +769,12 @@ class _HistoryChartsSection extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 4),
+        const Text(
+          'Trend compares your average this week with last week.',
+          style: TextStyle(color: Colors.white38, fontSize: 12),
+        ),
+        const SizedBox(height: 14),
         const Text(
           'Score over time (0-100)',
           style: TextStyle(
@@ -876,6 +907,172 @@ class _HistoryChartsSection extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Digital Burnout and Occupational Stress trends side by side. Each keeps its
+/// own scale and colour and they are never merged into one number.
+class _TrendsAtAGlance extends StatelessWidget {
+  final List<BurnoutHistoryPoint> burnout;
+  final OccupationalHistory? occupational;
+
+  const _TrendsAtAGlance({required this.burnout, required this.occupational});
+
+  @override
+  Widget build(BuildContext context) {
+    final burnoutValues = burnout.map((p) => p.score).toList();
+    final occupationalValues = (occupational?.assessments ??
+            const <OccupationalHistoryPoint>[])
+        .map((p) => p.score.toDouble())
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _MiniTrendCard(
+                title: 'Digital burnout',
+                scale: 'Score 1-10',
+                color: const Color(0xFF8A5CE6),
+                values: burnoutValues,
+                minY: 0,
+                maxY: 10,
+                latestText: burnoutValues.isEmpty
+                    ? '--'
+                    : burnoutValues.last.toStringAsFixed(1),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _MiniTrendCard(
+                title: 'Occupational stress',
+                scale: 'Score 0-100',
+                color: const Color(0xFFFFB020),
+                values: occupationalValues,
+                minY: 0,
+                maxY: 100,
+                latestText: occupationalValues.isEmpty
+                    ? '--'
+                    : occupationalValues.last.toStringAsFixed(0),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'Shown separately on purpose: the two scores measure different '
+          'things using different methods, so they are never combined.',
+          style: TextStyle(color: Colors.white38, fontSize: 12, height: 1.4),
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniTrendCard extends StatelessWidget {
+  final String title;
+  final String scale;
+  final String latestText;
+  final Color color;
+  final List<double> values;
+  final double minY;
+  final double maxY;
+
+  const _MiniTrendCard({
+    required this.title,
+    required this.scale,
+    required this.latestText,
+    required this.color,
+    required this.values,
+    required this.minY,
+    required this.maxY,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final spots = [
+      for (var i = 0; i < values.length; i++) FlSpot(i.toDouble(), values[i]),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111217),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            latestText,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          Text(
+            scale,
+            style: const TextStyle(color: Colors.white38, fontSize: 11),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 80,
+            child: values.length >= 2
+                ? LineChart(
+                    LineChartData(
+                      minY: minY,
+                      maxY: maxY,
+                      minX: 0,
+                      maxX: (values.length - 1).toDouble(),
+                      gridData: FlGridData(show: false),
+                      borderData: FlBorderData(show: false),
+                      titlesData: const FlTitlesData(show: false),
+                      lineTouchData: LineTouchData(enabled: false),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: spots,
+                          isCurved: true,
+                          color: color,
+                          barWidth: 2.5,
+                          dotData: FlDotData(show: values.length <= 8),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            color: color.withValues(alpha: 0.12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : const Center(
+                    child: Text(
+                      'Not enough data yet',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white38, fontSize: 12),
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${values.length} ${values.length == 1 ? 'result' : 'results'}',
+            style: const TextStyle(color: Colors.white38, fontSize: 11),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -78,3 +78,20 @@ The project follows a client-server architecture.
        │ LSTM        │    │   Stress    │    │ Assessments │
        │ ML Models   │    │   Analysis  │    │ History     │
        └─────────────┘    └─────────────┘    └─────────────┘
+```
+
+---
+
+# 🧪 Running the backend tests
+
+```bash
+cd Backend
+pip install -r requirements-dev.txt
+pytest
+```
+
+- Occupational Stress tests (personas, contributor direction, context layer,
+  plan rules, wording guard, weekly trend) run against a throwaway database —
+  `users.db` is never touched.
+- The Digital Burnout regression tests boot the full app and need `torch` and
+  `tensorflow` installed; they are skipped automatically if those can't load.

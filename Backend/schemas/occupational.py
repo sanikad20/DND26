@@ -30,6 +30,17 @@ class DayPlanItem(BaseModel):
     day: int
     title: str
     detail: str
+    # Concrete actions for the day. Optional so older clients that only read
+    # day/title/detail keep working.
+    tasks: List[str] = Field(default_factory=list)
+
+
+class RecommendationItem(BaseModel):
+    """A recommendation tied to the contributor that triggered it, so the
+    app can show a title without guessing from list position."""
+
+    label: str
+    text: str
 
 
 class AssessmentResult(BaseModel):
@@ -41,6 +52,7 @@ class AssessmentResult(BaseModel):
     context_contributors: List[ContributorItem]
     protective_factors: List[str]
     recommendations: List[str]
+    recommendation_items: List[RecommendationItem] = Field(default_factory=list)
     plan: List[DayPlanItem]
     model_version: str
     placeholder_scoring: bool

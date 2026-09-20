@@ -39,6 +39,10 @@ class ApiService {
     return _occupationalService.assess(answers);
   }
 
+  Future<Map<int, String>> getOccupationalQuestionTexts() {
+    return _occupationalService.getQuestionTexts();
+  }
+
   Future<OccupationalHistory> getOccupationalHistory(String firebaseUid) {
     return _occupationalService.getHistory(firebaseUid);
   }

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'config/api_config.dart';
+import 'features/burnout/state/burnout_history_store.dart';
 
 class PredictionScreen extends StatefulWidget {
   const PredictionScreen({super.key});
@@ -62,6 +63,11 @@ class _PredictionScreenState extends State<PredictionScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        BurnoutHistoryStore.instance.record(
+          score: double.parse(data["prediction"].toString()),
+          level: data["stress_level"].toString(),
+          source: 'Manual',
+        );
         setState(() {
           predictedStress =
               double.parse(data["prediction"].toString()).toStringAsFixed(2);

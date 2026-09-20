@@ -146,7 +146,14 @@ class OccupationalService:
             recommendations=self._recommendations.build_recommendations(
                 model_contributors, context_contributors
             ),
-            plan=self._recommendations.build_plan(model_output.risk_level),
+            recommendation_items=self._recommendations.build_recommendation_items(
+                model_contributors, context_contributors
+            ),
+            plan=self._recommendations.build_plan(
+                model_output.risk_level,
+                model_contributors,
+                context_contributors,
+            ),
             model_version=self._model.model_version,
             placeholder_scoring=False,
             generated_at=datetime.utcnow().isoformat(),
@@ -163,7 +170,16 @@ class OccupationalService:
         risk_level: str,
         answers: OccupationalAnswers,
     ) -> int:
+        """Small, capped refinement from the 7 CONTEXT answers (Section 6.1).
+
+        Can move the score up (strain) or down (protective), never by more
+        than +/-15, and can never lift a Low result into High territory.
+        The risk LABEL is never touched here — it always comes from the model.
+        The point weights are hand-set placeholders, not learned from data.
+        """
         nudge = 0.0
+
+        # Strain: pushes the score up.
         if answers.duty_hours_per_day >= 12:
             nudge += 3
         if answers.night_duties_last_2wks >= 6:
@@ -176,6 +192,17 @@ class OccupationalService:
             nudge += 2
         if answers.family_time <= 2:
             nudge += 2
+
+        # Protective: pulls the score down. Mirrors the protective factors
+        # shown on the result screen.
+        if answers.recovery_quality >= 4:
+            nudge -= 2
+        if answers.family_time >= 4:
+            nudge -= 2
+        if answers.leave_days_taken_3mo >= 5:
+            nudge -= 2
+        if answers.days_since_last_leave <= 14:
+            nudge -= 2
 
         nudged_score = base_score + max(-15.0, min(15.0, nudge))
         if risk_level == "Low":

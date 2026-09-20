@@ -41,11 +41,27 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
   final OccupationalPlanProgress _planProgress =
       OccupationalPlanProgress.instance;
 
+  // Question wording fetched from GET /occupational/questionnaire. Empty until
+  // it loads (or if the request fails) — the built-in wording is the fallback.
+  Map<int, String> _questionTexts = const {};
+
   @override
   void initState() {
     super.initState();
     _planProgress.addListener(_refreshPlanState);
     _planProgress.load();
+    _loadQuestionTexts();
+  }
+
+  Future<void> _loadQuestionTexts() async {
+    try {
+      final texts = await ApiService.instance.getOccupationalQuestionTexts();
+      if (!mounted) return;
+      setState(() => _questionTexts = texts);
+    } catch (_) {
+      // Keep the built-in wording; the assessment itself will surface any
+      // connectivity problem when the user submits.
+    }
   }
 
   @override
@@ -69,12 +85,21 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
       return;
     }
 
+    // Assessments are stored per Firebase user, so never submit without one
+    // (a shared fallback id would mix strangers' history together).
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      setState(() {
+        _errorText = 'Please sign in again before running an assessment.';
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorText = null;
     });
 
-    final uid = FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user';
     final answers = OccupationalAnswers(
       firebaseUid: uid,
       dutyHoursPerDay: dutyHoursPerDay,
@@ -199,18 +224,50 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
     }
   }
 
+  IconData _iconForLabel(String label) {
+    final text = label.toLowerCase();
+    if (text.contains('workload')) return Icons.work_outline;
+    if (text.contains('control')) return Icons.event_note_outlined;
+    if (text.contains('support')) return Icons.groups_outlined;
+    if (text.contains('effort') || text.contains('reward')) {
+      return Icons.balance_outlined;
+    }
+    if (text.contains('duty hours')) return Icons.schedule_outlined;
+    if (text.contains('night')) return Icons.dark_mode_outlined;
+    // Checked before 'recovery': "Limited family/social recovery time"
+    // contains both words.
+    if (text.contains('family') || text.contains('social')) {
+      return Icons.family_restroom_outlined;
+    }
+    if (text.contains('recovery')) return Icons.bedtime_outlined;
+    return Icons.tips_and_updates_outlined;
+  }
+
   List<WellnessRecommendation> _recommendations() {
     final result = _result;
     if (result == null) return const [];
 
+    // The backend is the source of truth for recommendations. The rules
+    // below only run for assessments saved by an older app version.
+    final fromServer = result.recommendationItems
+        .map(
+          (item) => WellnessRecommendation(
+            icon: _iconForLabel(item.label),
+            title: item.label,
+            body: item.text,
+          ),
+        )
+        .toList();
+    final useLocalRules = fromServer.isEmpty;
+
     final labels = result.contributorLabels
         .map((e) => e.toLowerCase())
         .toList();
-    final recommendations = <WellnessRecommendation>[];
+    final recommendations = <WellnessRecommendation>[...fromServer];
 
     bool has(String text) => labels.any((label) => label.contains(text));
 
-    if (has('workload')) {
+    if (useLocalRules && has('workload')) {
       recommendations.add(
         const WellnessRecommendation(
           icon: Icons.work_outline,
@@ -220,7 +277,7 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
         ),
       );
     }
-    if (has('low control')) {
+    if (useLocalRules && has('low control')) {
       recommendations.add(
         const WellnessRecommendation(
           icon: Icons.event_note_outlined,
@@ -230,7 +287,7 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
         ),
       );
     }
-    if (has('support')) {
+    if (useLocalRules && has('support')) {
       recommendations.add(
         const WellnessRecommendation(
           icon: Icons.groups_outlined,
@@ -240,7 +297,7 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
         ),
       );
     }
-    if (has('family') || has('social')) {
+    if (useLocalRules && (has('family') || has('social'))) {
       recommendations.add(
         const WellnessRecommendation(
           icon: Icons.family_restroom_outlined,
@@ -250,7 +307,7 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
         ),
       );
     }
-    if (has('effort-reward')) {
+    if (useLocalRules && has('effort-reward')) {
       recommendations.add(
         const WellnessRecommendation(
           icon: Icons.balance_outlined,
@@ -260,7 +317,7 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
         ),
       );
     }
-    if (has('recovery')) {
+    if (useLocalRules && has('recovery')) {
       recommendations.add(
         const WellnessRecommendation(
           icon: Icons.bedtime_outlined,
@@ -270,7 +327,7 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
         ),
       );
     }
-    if (has('long duty')) {
+    if (useLocalRules && has('long duty')) {
       recommendations.add(
         const WellnessRecommendation(
           icon: Icons.schedule_outlined,
@@ -280,7 +337,7 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
         ),
       );
     }
-    if (has('night-shift')) {
+    if (useLocalRules && has('night-shift')) {
       recommendations.add(
         const WellnessRecommendation(
           icon: Icons.dark_mode_outlined,
@@ -365,6 +422,7 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
                     builder: (context, constraints) {
                       final wide = constraints.maxWidth >= 980;
                       final questions = _QuestionnairePanel(
+                        questionTexts: _questionTexts,
                         isLoading: _isLoading,
                         dutyHoursPerDay: dutyHoursPerDay,
                         nightDutiesLast2wks: nightDutiesLast2wks,
@@ -562,6 +620,7 @@ class _HeaderCard extends StatelessWidget {
 }
 
 class _QuestionnairePanel extends StatelessWidget {
+  final Map<int, String> questionTexts;
   final bool isLoading;
   final double dutyHoursPerDay;
   final double nightDutiesLast2wks;
@@ -589,6 +648,7 @@ class _QuestionnairePanel extends StatelessWidget {
   final ValueChanged<double> onRewardChanged;
 
   const _QuestionnairePanel({
+    required this.questionTexts,
     required this.isLoading,
     required this.dutyHoursPerDay,
     required this.nightDutiesLast2wks,
@@ -615,6 +675,9 @@ class _QuestionnairePanel extends StatelessWidget {
     required this.onEffortChanged,
     required this.onRewardChanged,
   });
+
+  // Server wording for question [number], or the built-in wording.
+  String _t(int number, String fallback) => questionTexts[number] ?? fallback;
 
   @override
   Widget build(BuildContext context) {
@@ -649,7 +712,7 @@ class _QuestionnairePanel extends StatelessWidget {
           _RangeQuestionCard(
             number: 1,
             total: 12,
-            title: 'Hours actively on duty per day',
+            title: _t(1, 'Hours actively on duty per day'),
             description: 'Use your typical active duty load.',
             value: dutyHoursPerDay,
             min: 4,
@@ -662,7 +725,7 @@ class _QuestionnairePanel extends StatelessWidget {
           _RangeQuestionCard(
             number: 2,
             total: 12,
-            title: 'Night duties or shifts in the last 2 weeks',
+            title: _t(2, 'Night duties or shifts in the last 2 weeks'),
             description: 'Count overnight or late-shift duty blocks.',
             value: nightDutiesLast2wks,
             min: 0,
@@ -675,7 +738,7 @@ class _QuestionnairePanel extends StatelessWidget {
           _RangeQuestionCard(
             number: 3,
             total: 12,
-            title: 'Consecutive days without a full rest day',
+            title: _t(3, 'Consecutive days without a full rest day'),
             description: 'Longest current stretch without a full rest day.',
             value: consecutiveDaysNoRest,
             min: 0,
@@ -688,7 +751,7 @@ class _QuestionnairePanel extends StatelessWidget {
           _RangeQuestionCard(
             number: 4,
             total: 12,
-            title: 'Days since your last leave or off day',
+            title: _t(4, 'Days since your last leave or off day'),
             description:
                 'Approximate days since meaningful time away from duty.',
             value: daysSinceLastLeave,
@@ -702,7 +765,7 @@ class _QuestionnairePanel extends StatelessWidget {
           _RangeQuestionCard(
             number: 5,
             total: 12,
-            title: 'Leave days taken in the last 3 months',
+            title: _t(5, 'Leave days taken in the last 3 months'),
             description: 'Include sanctioned leave or full off-duty days.',
             value: leaveDaysTaken3mo,
             min: 0,
@@ -715,7 +778,7 @@ class _QuestionnairePanel extends StatelessWidget {
           _LikertQuestionCard(
             number: 11,
             total: 12,
-            title: 'Sleep and recovery quality this week',
+            title: _t(11, 'Sleep and recovery quality this week'),
             description: 'Rate how restorative your rest has felt.',
             lowLabel: 'Very poor',
             highLabel: 'Excellent',
@@ -726,7 +789,7 @@ class _QuestionnairePanel extends StatelessWidget {
           _LikertQuestionCard(
             number: 12,
             total: 12,
-            title: 'Quality time with family or loved ones',
+            title: _t(12, 'Quality time with family or loved ones'),
             description: 'Think about the last 2 weeks.',
             lowLabel: 'None',
             highLabel: 'Plenty',
@@ -744,7 +807,7 @@ class _QuestionnairePanel extends StatelessWidget {
           _LikertQuestionCard(
             number: 6,
             total: 12,
-            title: 'How demanding is your current workload?',
+            title: _t(6, 'How demanding is your current workload?'),
             description: 'Consider pace, volume, and pressure.',
             lowLabel: 'Very light',
             highLabel: 'Very demanding',
@@ -755,7 +818,7 @@ class _QuestionnairePanel extends StatelessWidget {
           _LikertQuestionCard(
             number: 7,
             total: 12,
-            title: 'How much control do you have over how and when you work?',
+            title: _t(7, 'How much control do you have over how and when you work?'),
             description: 'Rate your practical say in work timing and methods.',
             lowLabel: 'None',
             highLabel: 'A great deal',
@@ -766,7 +829,7 @@ class _QuestionnairePanel extends StatelessWidget {
           _LikertQuestionCard(
             number: 8,
             total: 12,
-            title: 'How supported do you feel by supervisors or organisation?',
+            title: _t(8, 'How supported do you feel by supervisors or organisation?'),
             description: 'Think about practical and emotional support.',
             lowLabel: 'Not at all',
             highLabel: 'Fully',
@@ -777,7 +840,7 @@ class _QuestionnairePanel extends StatelessWidget {
           _LikertQuestionCard(
             number: 9,
             total: 12,
-            title: "Effort required relative to what's expected",
+            title: _t(9, "Effort required relative to what's expected"),
             description: 'Rate the level of effort your current duty requires.',
             lowLabel: 'Much less',
             highLabel: 'Much more',
@@ -788,7 +851,7 @@ class _QuestionnairePanel extends StatelessWidget {
           _LikertQuestionCard(
             number: 10,
             total: 12,
-            title: 'How adequately recognised or rewarded is that effort?',
+            title: _t(10, 'How adequately recognised or rewarded is that effort?'),
             description: 'Include recognition, fairness, and perceived return.',
             lowLabel: 'Not at all',
             highLabel: 'Very well',
@@ -979,12 +1042,15 @@ class _WellnessPlanPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final completeCount = completedDays.length;
+    final total = days.isEmpty ? 7 : days.length;
+    // Low risk gets a short "maintain" list instead of a full 7-day plan.
+    final isMaintain = total < 7;
     return _Panel(
-      title: '7-day wellness plan',
-      subtitle: 'Completion is local for now. Day 4 can persist this state.',
+      title: isMaintain ? 'Maintain plan' : '7-day wellness plan',
+      subtitle: 'Progress is saved on this device.',
       trailing: started
           ? Text(
-              '$completeCount / 7 completed',
+              '$completeCount / $total completed',
               style: const TextStyle(color: Colors.white70),
             )
           : null,
@@ -992,7 +1058,7 @@ class _WellnessPlanPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           LinearProgressIndicator(
-            value: completeCount / 7,
+            value: completeCount / total,
             minHeight: 8,
             borderRadius: BorderRadius.circular(20),
             backgroundColor: Colors.white10,
@@ -1008,9 +1074,9 @@ class _WellnessPlanPanel extends StatelessWidget {
                   Icons.calendar_today_outlined,
                   color: Colors.white,
                 ),
-                label: const Text(
-                  'Start 7-Day Plan',
-                  style: TextStyle(color: Colors.white),
+                label: Text(
+                  isMaintain ? 'Start Maintain Plan' : 'Start 7-Day Plan',
+                  style: const TextStyle(color: Colors.white),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF45199D),

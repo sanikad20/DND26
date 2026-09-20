@@ -4,6 +4,10 @@ import '../models/occupational_plan_day.dart';
 List<OccupationalPlanDay> buildOccupationalPlanDays(
   OccupationalAssessmentResult? result,
 ) {
+  // The backend is the source of truth for the plan. The rules below are only
+  // a fallback for assessments saved by an older app version.
+  if (result != null && result.plan.isNotEmpty) return result.plan;
+
   final labels = result?.contributorLabels.join(' ').toLowerCase() ?? '';
   final recoveryFocus =
       labels.contains('recovery') ||

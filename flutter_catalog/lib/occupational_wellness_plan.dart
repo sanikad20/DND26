@@ -45,7 +45,10 @@ class _OccupationalWellnessPlanScreenState
   @override
   Widget build(BuildContext context) {
     final days = buildOccupationalPlanDays(widget.assessment);
-    final nextDay = _progress.nextOpenDay();
+    final totalDays = days.length;
+    // Low risk gets a short "maintain" list instead of a full 7-day plan.
+    final isMaintain = totalDays < 7;
+    final nextDay = _progress.nextOpenDay(totalDays);
     final riskLevel = widget.assessment?.riskLevel ?? 'Assessment pending';
 
     return Scaffold(
@@ -54,9 +57,12 @@ class _OccupationalWellnessPlanScreenState
         backgroundColor: const Color(0xFF0B0B0F),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text(
-          '7-Day Wellness Plan',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        title: Text(
+          isMaintain ? 'Maintain Plan' : '7-Day Wellness Plan',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
       body: SafeArea(
@@ -72,6 +78,8 @@ class _OccupationalWellnessPlanScreenState
                     completed: _progress.completedCount,
                     started: _progress.started,
                     riskLevel: riskLevel,
+                    totalDays: totalDays,
+                    isMaintain: isMaintain,
                     onStart: _progress.start,
                     onNext: () => _progress.setDayCompleted(nextDay, true),
                     onReset: _progress.resetForNewAssessment,
@@ -120,6 +128,8 @@ class _PlanHeader extends StatelessWidget {
   final int completed;
   final bool started;
   final String riskLevel;
+  final int totalDays;
+  final bool isMaintain;
   final int nextDay;
   final VoidCallback onStart;
   final VoidCallback onNext;
@@ -129,6 +139,8 @@ class _PlanHeader extends StatelessWidget {
     required this.completed,
     required this.started,
     required this.riskLevel,
+    required this.totalDays,
+    required this.isMaintain,
     required this.nextDay,
     required this.onStart,
     required this.onNext,
@@ -137,7 +149,7 @@ class _PlanHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final allDone = completed >= 7;
+    final allDone = completed >= totalDays;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -169,9 +181,11 @@ class _PlanHeader extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Interactive 7-day wellness plan',
-                      style: TextStyle(
+                    Text(
+                      isMaintain
+                          ? 'Keep-it-steady plan'
+                          : 'Interactive 7-day wellness plan',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 23,
                         fontWeight: FontWeight.w800,
@@ -192,7 +206,7 @@ class _PlanHeader extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           LinearProgressIndicator(
-            value: completed / 7,
+            value: completed / totalDays,
             minHeight: 8,
             borderRadius: BorderRadius.circular(20),
             backgroundColor: Colors.white10,
@@ -200,7 +214,7 @@ class _PlanHeader extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            '$completed / 7 days completed',
+            '$completed / $totalDays days completed',
             style: const TextStyle(
               color: Colors.white70,
               fontWeight: FontWeight.w700,

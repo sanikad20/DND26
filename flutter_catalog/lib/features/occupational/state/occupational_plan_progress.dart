@@ -60,11 +60,11 @@ class OccupationalPlanProgress extends ChangeNotifier {
     await _save();
   }
 
-  int nextOpenDay() {
-    for (var day = 1; day <= 7; day++) {
+  int nextOpenDay([int totalDays = 7]) {
+    for (var day = 1; day <= totalDays; day++) {
       if (!_completedDays.contains(day)) return day;
     }
-    return 7;
+    return totalDays;
   }
 
   Future<void> _save() async {

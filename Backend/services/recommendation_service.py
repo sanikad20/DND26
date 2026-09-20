@@ -1,4 +1,13 @@
-from schemas.occupational import ContributorItem, DayPlanItem, OccupationalAnswers
+from core.logging import get_logger
+from core.safety import find_banned_terms
+from schemas.occupational import (
+    ContributorItem,
+    DayPlanItem,
+    OccupationalAnswers,
+    RecommendationItem,
+)
+
+logger = get_logger(__name__)
 
 
 # Top 3 across both contributor lists, MODEL first (the trained model is
@@ -41,22 +50,38 @@ _MODEL_FEATURE_LABELS = {
 # pre-existing threshold-rule behaviour this replaces.
 _CONTRIBUTION_THRESHOLD = 0.15
 
+# Low risk gets a short "maintain" list instead of a full plan (Section 6.3).
 _MAINTAIN_TIPS = [
-    "Keep taking your leave days as they come up rather than banking them.",
-    "Keep your weekly check-in with a trusted senior/peer going.",
-    "Protect at least one full rest day a week, even during busier stretches.",
+    (
+        "Use your leave",
+        "Keep taking your leave days as they come up rather than banking them.",
+    ),
+    (
+        "Keep your check-in",
+        "Keep your weekly check-in with a trusted senior/peer going.",
+    ),
+    (
+        "Protect a rest day",
+        "Protect at least one full rest day a week, even during busier stretches.",
+    ),
 ]
 
-_FULL_PLAN_TEMPLATE = [
-    ("Name it", "Note down which duty patterns felt heaviest this week — specific shifts, not a general feeling."),
-    ("One conversation", "Raise your top flagged factor with a supervisor or trusted senior."),
-    ("Protect one block", "Block out one uninterrupted rest period and treat it as non-negotiable."),
-    ("Check the roster", "Look at your next 2 weeks' schedule for an avoidable clash (back-to-back night shifts, no leave gap)."),
-    ("Reach out", "Spend real time with family/friends outside duty hours — even one evening counts."),
-    ("Follow up", "Check whether the conversation from Day 2 led anywhere; escalate once more if not."),
-    ("Repeat the assessment", "Retake this assessment and compare your score against today's."),
+# Used to fill the three "focus" days when fewer than 3 contributors were
+# flagged, so a Moderate/High plan is always a full 7 days.
+_DEFAULT_FOCUS = [
+    (
+        "Protect one block",
+        "Block out one uninterrupted rest period and treat it as non-negotiable.",
+    ),
+    (
+        "Check the roster",
+        "Look at your next 2 weeks' schedule for an avoidable clash (back-to-back night shifts, no leave gap).",
+    ),
+    (
+        "One conversation",
+        "Raise your biggest current pressure with a supervisor or trusted senior.",
+    ),
 ]
-
 
 class RecommendationService:
     def model_contributors(
@@ -121,31 +146,143 @@ class RecommendationService:
             factors.append("Strong supervisor/org support")
         return factors
 
-    def build_recommendations(
+    def build_recommendation_items(
         self,
         model_contributors: list[ContributorItem],
         context_contributors: list[ContributorItem],
-    ) -> list[str]:
+    ) -> list[RecommendationItem]:
         """Top 3 across both lists, MODEL first, in flagged order. Not a
         full dump of every contributor — a High-risk result with several
         contributors firing still gets exactly 3 focused recommendations."""
         ordered_labels = [c.label for c in model_contributors] + [
             c.label for c in context_contributors
         ]
-        top3 = ordered_labels[:3]
+        items: list[RecommendationItem] = []
+        for label in ordered_labels[:3]:
+            text = _RECOMMENDATION_BY_CONTRIBUTOR.get(label)
+            if text and self._is_safe(text):
+                items.append(RecommendationItem(label=label, text=text))
+        return items
+
+    def build_recommendations(
+        self,
+        model_contributors: list[ContributorItem],
+        context_contributors: list[ContributorItem],
+    ) -> list[str]:
         return [
-            _RECOMMENDATION_BY_CONTRIBUTOR[label]
-            for label in top3
-            if label in _RECOMMENDATION_BY_CONTRIBUTOR
+            item.text
+            for item in self.build_recommendation_items(
+                model_contributors, context_contributors
+            )
         ]
 
-    def build_plan(self, risk_level: str) -> list[DayPlanItem]:
+    def build_plan(
+        self,
+        risk_level: str,
+        model_contributors: list[ContributorItem] | None = None,
+        context_contributors: list[ContributorItem] | None = None,
+    ) -> list[DayPlanItem]:
+        """Low risk -> 3 "maintain" tips. Moderate/High -> a 7-day plan whose
+        middle days (2-4) are built from the top 3 contributors, so two High
+        results with different causes get different plans (Section 6.3).
+        Day 7 is always "Repeat the assessment" — it powers the trend."""
         if risk_level == "Low":
             return [
-                DayPlanItem(day=i + 1, title="Maintain", detail=tip)
-                for i, tip in enumerate(_MAINTAIN_TIPS)
+                self._checked_day(
+                    DayPlanItem(
+                        day=i + 1,
+                        title=title,
+                        detail="Keep this going while things are steady.",
+                        tasks=[tip],
+                    )
+                )
+                for i, (title, tip) in enumerate(_MAINTAIN_TIPS)
             ]
-        return [
-            DayPlanItem(day=i + 1, title=title, detail=detail)
-            for i, (title, detail) in enumerate(_FULL_PLAN_TEMPLATE)
+
+        top_labels = [
+            c.label
+            for c in (model_contributors or []) + (context_contributors or [])
+        ][:3]
+
+        focus_days: list[tuple[str, str, str]] = []  # (title, detail, task)
+        for label in top_labels:
+            text = _RECOMMENDATION_BY_CONTRIBUTOR.get(label)
+            if text:
+                focus_days.append(
+                    (
+                        f"Focus: {label}",
+                        "One of your top flagged factors — a small, specific step this week.",
+                        text,
+                    )
+                )
+        for title, task in _DEFAULT_FOCUS:
+            if len(focus_days) >= 3:
+                break
+            focus_days.append(
+                (title, "A small step that helps whatever is weighing on you most.", task)
+            )
+
+        days = [
+            DayPlanItem(
+                day=1,
+                title="Reset & recover",
+                detail="Begin with a simple reset so the week feels manageable.",
+                tasks=[
+                    "Note how you slept and how heavy duty felt today.",
+                    "Choose one protected rest or decompression window.",
+                ],
+            )
         ]
+        for offset, (title, detail, task) in enumerate(focus_days[:3]):
+            days.append(
+                DayPlanItem(day=2 + offset, title=title, detail=detail, tasks=[task])
+            )
+        days.extend(
+            [
+                DayPlanItem(
+                    day=5,
+                    title="Family & social connection",
+                    detail="Time with people outside duty is one of the strongest recovery supports.",
+                    tasks=[
+                        "Spend real time with family or friends outside duty hours — even one evening counts.",
+                    ],
+                ),
+                DayPlanItem(
+                    day=6,
+                    title="Recharge & support",
+                    detail="A short recharge routine helps carry the plan into the final day.",
+                    tasks=[
+                        "Do a short walk, stretch or quiet decompression routine.",
+                        "Check in with one trusted peer or senior.",
+                    ],
+                ),
+                DayPlanItem(
+                    day=7,
+                    title="Repeat the assessment",
+                    detail="Compare your score with today's to see whether this week's steps helped.",
+                    tasks=[
+                        "Retake this assessment and compare your score against the one from Day 1.",
+                    ],
+                ),
+            ]
+        )
+        return [self._checked_day(day) for day in days]
+
+    # -- wording guard (Section 6.3) --------------------------------------
+
+    @staticmethod
+    def _is_safe(text: str) -> bool:
+        found = find_banned_terms(text)
+        if found:
+            logger.warning("Dropped unsafe wellness wording %s: %r", found, text)
+        return not found
+
+    def _checked_day(self, day: DayPlanItem) -> DayPlanItem:
+        """Replace any line that trips the guard with a neutral fallback
+        rather than ever shipping it."""
+        safe_tasks = [t for t in day.tasks if self._is_safe(t)]
+        safe_detail = day.detail if self._is_safe(day.detail) else ""
+        safe_title = day.title if self._is_safe(day.title) else f"Day {day.day}"
+        return DayPlanItem(
+            day=day.day, title=safe_title, detail=safe_detail, tasks=safe_tasks
+        )

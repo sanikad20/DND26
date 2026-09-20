@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'usage_service.dart';
+import 'features/burnout/state/burnout_history_store.dart';
 
 class ContinuousMonitoringScreen extends StatefulWidget {
   const ContinuousMonitoringScreen({super.key});
@@ -127,6 +128,12 @@ class _ContinuousMonitoringScreenState
           final result = await ApiService.instance.predictLSTM(
             pastDays: pastDays,
             today:    todayUsage,
+          );
+
+          BurnoutHistoryStore.instance.record(
+            score:  result.score,
+            level:  result.level,
+            source: 'LSTM',
           );
 
           if (mounted) setState(() {

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'prediction_screen.dart';
 import 'continuous_monitoring_consent_screen.dart';
 import 'welcome_screen.dart';
+import 'occupational_consent_screen.dart';
 import 'occupational_wellness_dashboard.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -81,171 +82,211 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Hello, $_firstName 👋',
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Choose how you want to monitor burnout.',
-              style: TextStyle(fontSize: 16, color: Colors.black54),
-            ),
-            const SizedBox(height: 28),
-
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF45199D), Color(0xFF6D3DE6)],
-                ),
-                borderRadius: BorderRadius.circular(24),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // Scrollable so the extra buttons never overflow short screens,
+          // while the Spacer still pins the buttons to the bottom on tall ones.
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(22),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight > 44
+                    ? constraints.maxHeight - 44
+                    : 0,
               ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Burnout Monitoring',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
+              child: IntrinsicHeight(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Hello, $_firstName 👋',
+                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
                     ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Use manual input or enable continuous monitoring for habit-based burnout detection.',
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.privacy_tip_outlined, color: Color(0xFF45199D)),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Privacy-first design: monitoring starts only after user consent.',
-                      style: TextStyle(fontSize: 15),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Choose how you want to monitor burnout.',
+                      style: TextStyle(fontSize: 16, color: Colors.black54),
                     ),
-                  ),
-                ],
-              ),
-            ),
+                    const SizedBox(height: 28),
 
-            const SizedBox(height: 18),
-
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.analytics_outlined, color: Color(0xFF45199D)),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Manual mode uses entered values, while continuous mode uses collected behavioral summaries.',
-                      style: TextStyle(fontSize: 15),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF45199D), Color(0xFF6D3DE6)],
+                        ),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Burnout Monitoring',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Use manual input or enable continuous monitoring for habit-based burnout detection.',
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+
+                    const SizedBox(height: 24),
+
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.privacy_tip_outlined, color: Color(0xFF45199D)),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Privacy-first design: monitoring starts only after user consent.',
+                              style: TextStyle(fontSize: 15),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.analytics_outlined, color: Color(0xFF45199D)),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Manual mode uses entered values, while continuous mode uses collected behavioral summaries.',
+                              style: TextStyle(fontSize: 15),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const Spacer(),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF45199D),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const PredictionScreen()),
+                        ),
+                        child: const Text(
+                          'Manual Mode',
+                          style: TextStyle(color: Colors.white, fontSize: 16),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFF45199D), width: 1.5),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ContinuousMonitoringConsentScreen(),
+                          ),
+                        ),
+                        child: const Text(
+                          'Continuous Monitoring',
+                          style: TextStyle(color: Color(0xFF45199D), fontSize: 16),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFF45199D), width: 1.5),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const OccupationalConsentScreen(),
+                          ),
+                        ),
+                        child: const Text(
+                          'Occupational Stress',
+                          style: TextStyle(color: Color(0xFF45199D), fontSize: 16),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFF45199D), width: 1.5),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const OccupationalWellnessDashboard(),
+                          ),
+                        ),
+                        child: const Text(
+                          'Wellness Dashboard',
+                          style: TextStyle(color: Color(0xFF45199D), fontSize: 16),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-
-            const Spacer(),
-
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF45199D),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const PredictionScreen()),
-                ),
-                child: const Text(
-                  'Manual Mode',
-                  style: TextStyle(color: Colors.white, fontSize: 16),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF45199D), width: 1.5),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ContinuousMonitoringConsentScreen(),
-                  ),
-                ),
-                child: const Text(
-                  'Continuous Monitoring',
-                  style: TextStyle(color: Color(0xFF45199D), fontSize: 16),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF45199D), width: 1.5),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const OccupationalWellnessDashboard(),
-                  ),
-                ),
-                child: const Text(
-                  'Occupational Wellness',
-                  style: TextStyle(color: Color(0xFF45199D), fontSize: 16),
-                ),
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
