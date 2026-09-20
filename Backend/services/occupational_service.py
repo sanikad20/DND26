@@ -130,12 +130,19 @@ class OccupationalService:
             answers=answers,
         )
 
+        model_contributors = self._recommendations.model_contributors(answers)
+        context_contributors = self._recommendations.context_contributors(answers)
+
         result = AssessmentResult(
             risk_level=model_output.risk_level,
             score=score,
-            model_contributors=self._recommendations.model_contributors(answers),
-            context_contributors=self._recommendations.context_contributors(answers),
+            model_contributors=model_contributors,
+            context_contributors=context_contributors,
             protective_factors=self._recommendations.protective_factors(answers),
+            recommendations=self._recommendations.build_recommendations(
+                model_contributors, context_contributors
+            ),
+            plan=self._recommendations.build_plan(model_output.risk_level),
             model_version=self._model.model_version,
             placeholder_scoring=False,
             generated_at=datetime.utcnow().isoformat(),

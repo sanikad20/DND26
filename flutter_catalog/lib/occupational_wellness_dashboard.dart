@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'api_service.dart';
 import 'occupational_stress_screen.dart';
 import 'occupational_wellness_plan.dart';
@@ -17,11 +19,16 @@ class _OccupationalWellnessDashboardState
   final OccupationalPlanProgress _planProgress =
       OccupationalPlanProgress.instance;
 
+  OccupationalHistory? _history;
+  bool _historyLoading = true;
+  String? _historyError;
+
   @override
   void initState() {
     super.initState();
     _planProgress.addListener(_refreshPlanState);
     _loadLocalState();
+    _loadHistory();
   }
 
   @override
@@ -38,6 +45,36 @@ class _OccupationalWellnessDashboardState
     setState(() => _latestAssessment = assessment);
   }
 
+  Future<void> _loadHistory() async {
+    setState(() {
+      _historyLoading = true;
+      _historyError = null;
+    });
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      if (!mounted) return;
+      setState(() {
+        _historyLoading = false;
+        _historyError = 'Sign in to view your wellness history.';
+      });
+      return;
+    }
+    try {
+      final history = await ApiService.instance.getOccupationalHistory(uid);
+      if (!mounted) return;
+      setState(() {
+        _history = history;
+        _historyLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _historyError = 'Could not load history from the backend.';
+        _historyLoading = false;
+      });
+    }
+  }
+
   void _refreshPlanState() {
     if (mounted) setState(() {});
   }
@@ -49,6 +86,7 @@ class _OccupationalWellnessDashboardState
         builder: (_) => OccupationalStressScreen(
           onAssessmentComplete: (assessment) {
             setState(() => _latestAssessment = assessment);
+            _loadHistory();
           },
         ),
       ),
@@ -56,6 +94,7 @@ class _OccupationalWellnessDashboardState
 
     if (result != null && mounted) {
       setState(() => _latestAssessment = result);
+      _loadHistory();
     }
   }
 
@@ -235,8 +274,13 @@ class _OccupationalWellnessDashboardState
                   ),
                   const SizedBox(height: 16),
                   _DashboardPanel(
-                    title: 'Day 4 history',
-                    child: _HistoryEmptyState(hasLatest: result != null),
+                    title: 'Wellness history',
+                    child: _HistoryChartsSection(
+                      history: _history,
+                      loading: _historyLoading,
+                      error: _historyError,
+                      hasLatest: result != null,
+                    ),
                   ),
                 ],
               ),
@@ -543,36 +587,295 @@ class _PlanSummary extends StatelessWidget {
   }
 }
 
-class _HistoryEmptyState extends StatelessWidget {
+class _HistoryChartsSection extends StatelessWidget {
+  final OccupationalHistory? history;
+  final bool loading;
+  final String? error;
   final bool hasLatest;
 
-  const _HistoryEmptyState({required this.hasLatest});
+  const _HistoryChartsSection({
+    required this.history,
+    required this.loading,
+    required this.error,
+    required this.hasLatest,
+  });
+
+  Color _trendColor(String trend) {
+    switch (trend) {
+      case 'Improving':
+        return const Color(0xFF3DDC97);
+      case 'Worsening':
+        return const Color(0xFFFF6B6B);
+      case 'Stable':
+        return const Color(0xFFFFB020);
+      default:
+        return Colors.white38;
+    }
+  }
+
+  IconData _trendIcon(String trend) {
+    switch (trend) {
+      case 'Improving':
+        return Icons.trending_down; // lower score = less risk = improving
+      case 'Worsening':
+        return Icons.trending_up;
+      case 'Stable':
+        return Icons.trending_flat;
+      default:
+        return Icons.show_chart;
+    }
+  }
+
+  double _riskToY(String riskLevel) {
+    switch (riskLevel) {
+      case 'Low':
+        return 1;
+      case 'Moderate':
+        return 2;
+      case 'High':
+        return 3;
+      default:
+        return 0;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF111217),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.timeline_outlined, color: Colors.white38),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              hasLatest
-                  ? 'Latest assessment is shown above. Database-backed history and trends are reserved for Day 4.'
-                  : 'No assessment history is stored in Day 3. Complete an assessment to view the current result and plan only.',
-              style: const TextStyle(color: Colors.white60, height: 1.4),
+    if (loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.4,
+              color: Color(0xFF8A5CE6),
             ),
           ),
-        ],
-      ),
+        ),
+      );
+    }
+
+    if (error != null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF111217),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white38, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                error!,
+                style: const TextStyle(color: Colors.white60, height: 1.4),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final data = history;
+    if (data == null || !data.hasEnoughForChart) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF111217),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.timeline_outlined, color: Colors.white38),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                hasLatest
+                    ? 'Complete one more assessment to start seeing a trend here. Each assessment is now saved to your account.'
+                    : 'No assessment history yet. Complete an assessment to start building your trend.',
+                style: const TextStyle(color: Colors.white60, height: 1.4),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final points = data.assessments;
+    final scoreSpots = [
+      for (var i = 0; i < points.length; i++)
+        FlSpot(i.toDouble(), points[i].score.toDouble()),
+    ];
+    final riskSpots = [
+      for (var i = 0; i < points.length; i++)
+        FlSpot(i.toDouble(), _riskToY(points[i].riskLevel)),
+    ];
+    final trendColor = _trendColor(data.trend);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(_trendIcon(data.trend), color: trendColor, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              'Trend: ${data.trend}',
+              style: TextStyle(
+                color: trendColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              '${points.length} assessments',
+              style: const TextStyle(color: Colors.white38, fontSize: 12),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        const Text(
+          'Score over time (0-100)',
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 140,
+          child: LineChart(
+            LineChartData(
+              minY: 0,
+              maxY: 100,
+              minX: 0,
+              maxX: (points.length - 1).toDouble(),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: 25,
+                getDrawingHorizontalLine: (_) =>
+                    FlLine(color: Colors.white10, strokeWidth: 1),
+              ),
+              borderData: FlBorderData(show: false),
+              titlesData: const FlTitlesData(
+                topTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: true, reservedSize: 30),
+                ),
+              ),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: scoreSpots,
+                  isCurved: true,
+                  color: const Color(0xFF8A5CE6),
+                  barWidth: 3,
+                  dotData: const FlDotData(show: true),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    color: const Color(0xFF8A5CE6).withValues(alpha: 0.12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'Risk level over time',
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 140,
+          child: LineChart(
+            LineChartData(
+              minY: 0.5,
+              maxY: 3.5,
+              minX: 0,
+              maxX: (points.length - 1).toDouble(),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: 1,
+                getDrawingHorizontalLine: (_) =>
+                    FlLine(color: Colors.white10, strokeWidth: 1),
+              ),
+              borderData: FlBorderData(show: false),
+              titlesData: FlTitlesData(
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                bottomTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 66,
+                    interval: 1,
+                    getTitlesWidget: (value, meta) {
+                      const labels = {1: 'Low', 2: 'Moderate', 3: 'High'};
+                      // fl_chart can call this at extra tick positions near
+                      // the axis edges (e.g. 0.5, 3.5) depending on chart
+                      // width — only render at the exact integer values we
+                      // actually mean, everything else stays blank.
+                      final rounded = value.round();
+                      if ((value - rounded).abs() > 0.01) {
+                        return const SizedBox.shrink();
+                      }
+                      final label = labels[rounded];
+                      if (label == null) return const SizedBox.shrink();
+                      return Text(
+                        label,
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 11,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: riskSpots,
+                  isCurved: false,
+                  color: trendColor,
+                  barWidth: 3,
+                  dotData: const FlDotData(show: true),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

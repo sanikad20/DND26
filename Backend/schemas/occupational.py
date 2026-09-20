@@ -26,6 +26,12 @@ class ContributorItem(BaseModel):
     layer: Literal["MODEL", "CONTEXT"]
 
 
+class DayPlanItem(BaseModel):
+    day: int
+    title: str
+    detail: str
+
+
 class AssessmentResult(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
@@ -34,6 +40,8 @@ class AssessmentResult(BaseModel):
     model_contributors: List[ContributorItem]
     context_contributors: List[ContributorItem]
     protective_factors: List[str]
+    recommendations: List[str]
+    plan: List[DayPlanItem]
     model_version: str
     placeholder_scoring: bool
     generated_at: str

@@ -2,12 +2,14 @@ export 'features/burnout/models/burnout_result.dart';
 export 'features/burnout/models/day_usage.dart';
 export 'features/occupational/models/occupational_answers.dart';
 export 'features/occupational/models/occupational_assessment_result.dart';
+export 'features/occupational/models/occupational_history.dart';
 
 import 'features/burnout/models/burnout_result.dart';
 import 'features/burnout/models/day_usage.dart';
 import 'features/burnout/services/burnout_service.dart';
 import 'features/occupational/models/occupational_answers.dart';
 import 'features/occupational/models/occupational_assessment_result.dart';
+import 'features/occupational/models/occupational_history.dart';
 import 'features/occupational/services/occupational_service.dart';
 
 class ApiService {
@@ -35,5 +37,9 @@ class ApiService {
     OccupationalAnswers answers,
   ) {
     return _occupationalService.assess(answers);
+  }
+
+  Future<OccupationalHistory> getOccupationalHistory(String firebaseUid) {
+    return _occupationalService.getHistory(firebaseUid);
   }
 }

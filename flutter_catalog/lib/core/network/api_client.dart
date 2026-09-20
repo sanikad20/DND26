@@ -43,4 +43,21 @@ class ApiClient {
       statusCode: response.statusCode,
     );
   }
+
+  Future<Map<String, dynamic>> getJson(
+    String path, {
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    final response = await _httpClient
+        .get(Uri.parse('$_baseUrl$path'))
+        .timeout(timeout);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw ApiException(
+      '$path error ${response.statusCode}: ${response.body}',
+      statusCode: response.statusCode,
+    );
+  }
 }

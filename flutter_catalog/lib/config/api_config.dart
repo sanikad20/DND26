@@ -7,7 +7,7 @@ class ApiConfig {
   static final ApiConfig instance = ApiConfig._();
 
   static const _key         = 'backend_base_url';
-  static const _defaultUrl = 'http://127.0.0.1:8001'; // emulator fallback
+  static const _defaultUrl = 'http://127.0.0.1:8000'; // emulator fallback
 
   String _baseUrl = _defaultUrl;
   String get baseUrl => _baseUrl;
