@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'api_service.dart';
-import 'occupational_stress_screen.dart';
+import 'occupational_consent_screen.dart';
 import 'occupational_wellness_plan.dart';
 
 class OccupationalWellnessDashboard extends StatefulWidget {
@@ -83,7 +83,7 @@ class _OccupationalWellnessDashboardState
     final result = await Navigator.push<OccupationalAssessmentResult>(
       context,
       MaterialPageRoute(
-        builder: (_) => OccupationalStressScreen(
+        builder: (_) => OccupationalConsentScreen(
           onAssessmentComplete: (assessment) {
             setState(() => _latestAssessment = assessment);
             _loadHistory();
