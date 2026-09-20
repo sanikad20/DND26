@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy import Column, DateTime, Integer, String, Text
 from sqlalchemy.sql import func
 from database import Base
 
@@ -19,4 +19,7 @@ class OccupationalAssessment(Base):
     risk_level = Column(String, nullable=False)
     score = Column(Integer, nullable=False)
     model_version = Column(String, nullable=False)
+    # JSON-serialized copy of the 12 raw answers, so a future model version
+    # can re-score this assessment without asking the person to redo it.
+    raw_answers = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

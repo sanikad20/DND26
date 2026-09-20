@@ -1,3 +1,5 @@
+import json
+
 from database import SessionLocal
 from core.config import settings
 from models import OccupationalAssessment
@@ -26,6 +28,7 @@ class OccupationalRepository:
                 risk_level=result.risk_level,
                 score=result.score,
                 model_version=result.model_version,
+                raw_answers=json.dumps(answers.model_dump(exclude={"firebase_uid"})),
             )
             db.add(row)
             db.commit()

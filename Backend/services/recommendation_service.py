@@ -9,13 +9,37 @@ _RECOMMENDATION_BY_CONTRIBUTOR = {
     "High workload": "Flag workload concerns to your immediate supervisor; ask about redistributing tasks during peak periods.",
     "Low control over work": "Raise scheduling/task-input concerns in your next unit briefing.",
     "Low supervisor/org support": "Identify one trusted senior/peer to check in with weekly.",
-    "Effort-reward imbalance": "Document your contributions for your next review cycle; discuss recognition gaps with your reporting officer.",
+    "High effort demands": "Document your contributions for your next review cycle so effort is visible and trackable.",
+    "Low recognition/reward": "Discuss recognition gaps directly with your reporting officer.",
     "Long duty hours": "Request a workload review if this pattern continues beyond 2 weeks.",
     "Insufficient recovery": "Prioritize at least one full rest day this week.",
     "Heavy night-shift load": "Speak to your scheduling officer about night-shift rotation frequency.",
     "Poor recovery quality": "Review your pre-sleep routine and duty-hour spacing with a medical/welfare officer if it doesn't improve.",
     "Limited family/social recovery time": "Block out dedicated time with family/friends outside duty hours, even briefly.",
 }
+
+# Feature -> plain-language label, used to turn the model's own math
+# (coefficient x distance from average — see ml/occupational_model.py)
+# into the same labels the UI already shows. The sign is already correct
+# in the contribution value itself: e.g. a LOW control answer produces a
+# POSITIVE contribution toward risk (because low control genuinely does
+# increase risk), so this mapping never needs its own threshold logic —
+# it just names whichever features the math actually flagged.
+_MODEL_FEATURE_LABELS = {
+    "demandmedia": "High workload",
+    "controlmedia": "Low control over work",
+    "supportmedia": "Low supervisor/org support",
+    "effortmedia": "High effort demands",
+    "rewardmedia": "Low recognition/reward",
+}
+
+# A feature counts as a real contributor (or, on the other side, a real
+# model-driven protective factor) only once its contribution crosses this
+# magnitude — near-zero contributions are just an average answer and
+# shouldn't read as a flagged driver either way. Chosen empirically so a
+# neutral "all 3s" persona shows nothing on either side, matching the
+# pre-existing threshold-rule behaviour this replaces.
+_CONTRIBUTION_THRESHOLD = 0.15
 
 _MAINTAIN_TIPS = [
     "Keep taking your leave days as they come up rather than banking them.",
@@ -37,24 +61,20 @@ _FULL_PLAN_TEMPLATE = [
 class RecommendationService:
     def model_contributors(
         self,
-        answers: OccupationalAnswers,
+        contributions: dict,
     ) -> list[ContributorItem]:
-        contributors: list[ContributorItem] = []
-        if answers.demand >= 4:
-            contributors.append(ContributorItem(label="High workload", layer="MODEL"))
-        if answers.control <= 2:
-            contributors.append(
-                ContributorItem(label="Low control over work", layer="MODEL")
-            )
-        if answers.support <= 2:
-            contributors.append(
-                ContributorItem(label="Low supervisor/org support", layer="MODEL")
-            )
-        if answers.effort >= 4 and answers.reward <= 2:
-            contributors.append(
-                ContributorItem(label="Effort-reward imbalance", layer="MODEL")
-            )
-        return contributors
+        """Built from the model's own coefficient x distance-from-average
+        math (the plan's specified explainability method for Logistic
+        Regression), not answer thresholds. Sorted by contribution size
+        so the biggest driver toward risk comes first."""
+        ranked = sorted(
+            contributions.items(), key=lambda kv: kv[1], reverse=True
+        )
+        return [
+            ContributorItem(label=_MODEL_FEATURE_LABELS[feature], layer="MODEL")
+            for feature, value in ranked
+            if value > _CONTRIBUTION_THRESHOLD
+        ]
 
     def context_contributors(
         self,
@@ -84,13 +104,20 @@ class RecommendationService:
             )
         return contributors
 
-    def protective_factors(self, answers: OccupationalAnswers) -> list[str]:
+    def protective_factors(
+        self,
+        answers: OccupationalAnswers,
+        contributions: dict,
+    ) -> list[str]:
         factors: list[str] = []
         if answers.leave_days_taken_3mo >= 5:
             factors.append("Recent leave taken")
         if answers.family_time >= 4:
             factors.append("Good family/social connection")
-        if answers.support >= 4:
+        # Model-driven: a strongly NEGATIVE contribution means that answer
+        # pushed away from High risk (the same coefficient x distance
+        # math as model_contributors, just the protective direction).
+        if contributions.get("supportmedia", 0) < -_CONTRIBUTION_THRESHOLD:
             factors.append("Strong supervisor/org support")
         return factors
 
@@ -100,7 +127,7 @@ class RecommendationService:
         context_contributors: list[ContributorItem],
     ) -> list[str]:
         """Top 3 across both lists, MODEL first, in flagged order. Not a
-        full dump of every contributor — a High-risk result with 7
+        full dump of every contributor — a High-risk result with several
         contributors firing still gets exactly 3 focused recommendations."""
         ordered_labels = [c.label for c in model_contributors] + [
             c.label for c in context_contributors

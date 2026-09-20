@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import joblib
 import numpy as np
@@ -11,6 +11,17 @@ from schemas.occupational import OccupationalAnswers
 class OccupationalModelOutput:
     risk_level: str
     base_score: float
+    # Per-feature contribution toward High risk specifically: coefficient
+    # (from the model's "High" class row) x standardized distance from the
+    # training-data average (Section: "Each answer's coefficient x how far
+    # it is from average"). Positive = pushed toward higher risk; negative
+    # = pushed toward lower risk (protective). Computed against the "High"
+    # row regardless of which class was actually predicted, so it always
+    # answers "how much did this answer push toward more stress" rather
+    # than "how much did it push toward whatever got predicted" — the
+    # latter would make e.g. a Low prediction's positive contributions
+    # read backwards (protective effects, not risk drivers).
+    contributions: dict = field(default_factory=dict)
 
 
 class OccupationalStressModel:
@@ -23,6 +34,7 @@ class OccupationalStressModel:
             settings.occupational_feature_anchors_path
         )
         self._feature_cols = joblib.load(settings.occupational_feature_cols_path)
+        self._high_class_idx = list(self._model.classes_).index("High")
 
     @property
     def model_version(self) -> str:
@@ -49,9 +61,16 @@ class OccupationalStressModel:
             for class_name in proba
         )
 
+        high_coefs = self._model.coef_[self._high_class_idx]
+        contributions = {
+            feature: float(high_coefs[i] * x_scaled[0][i])
+            for i, feature in enumerate(self._feature_cols)
+        }
+
         return OccupationalModelOutput(
             risk_level=predicted_class,
             base_score=max(0.0, min(100.0, base_score)),
+            contributions=contributions,
         )
 
     def _likert_to_dcs_eri(self, value: int, feature: str) -> float:

@@ -130,7 +130,9 @@ class OccupationalService:
             answers=answers,
         )
 
-        model_contributors = self._recommendations.model_contributors(answers)
+        model_contributors = self._recommendations.model_contributors(
+            model_output.contributions
+        )
         context_contributors = self._recommendations.context_contributors(answers)
 
         result = AssessmentResult(
@@ -138,7 +140,9 @@ class OccupationalService:
             score=score,
             model_contributors=model_contributors,
             context_contributors=context_contributors,
-            protective_factors=self._recommendations.protective_factors(answers),
+            protective_factors=self._recommendations.protective_factors(
+                answers, model_output.contributions
+            ),
             recommendations=self._recommendations.build_recommendations(
                 model_contributors, context_contributors
             ),
