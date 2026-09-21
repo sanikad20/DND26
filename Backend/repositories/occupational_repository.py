@@ -4,7 +4,7 @@ from statistics import mean
 
 from database import SessionLocal
 from core.config import settings
-from models import OccupationalAssessment
+from models import OccupationalAssessment, WellnessPlan
 from schemas.occupational import AssessmentResult, HistoryPoint, HistoryResponse, OccupationalAnswers
 
 # Week-over-week trend (Section 6.4): "this week" is the last 7 days,
@@ -23,18 +23,24 @@ class OccupationalRepository:
         self,
         answers: OccupationalAnswers,
         result: AssessmentResult,
-    ) -> None:
+        firebase_uid: str,
+    ) -> OccupationalAssessment:
+        """Persists the assessment and returns the saved row (with its
+        generated id) so the caller can create the matching wellness plan
+        and report the id back to the client."""
         db = SessionLocal()
         try:
             row = OccupationalAssessment(
-                firebase_uid=answers.firebase_uid,
+                firebase_uid=firebase_uid,
                 risk_level=result.risk_level,
                 score=result.score,
                 model_version=result.model_version,
-                raw_answers=json.dumps(answers.model_dump(exclude={"firebase_uid"})),
+                raw_answers=json.dumps(answers.model_dump()),
             )
             db.add(row)
             db.commit()
+            db.refresh(row)
+            return row
         finally:
             db.close()
 
@@ -47,14 +53,25 @@ class OccupationalRepository:
                 .order_by(OccupationalAssessment.created_at.asc())
                 .all()
             )
+
+            # One query for all plans belonging to this uid, then match them
+            # up in memory - avoids N+1 queries against wellness_plans.
+            plan_rows = (
+                db.query(WellnessPlan)
+                .filter(WellnessPlan.firebase_uid == firebase_uid)
+                .all()
+            )
+            plan_id_by_assessment = {p.assessment_id: p.id for p in plan_rows}
         finally:
             db.close()
 
         assessments = [
             HistoryPoint(
+                id=row.id,
                 timestamp=row.created_at.isoformat(),
                 score=row.score,
                 risk_level=row.risk_level,
+                plan_id=plan_id_by_assessment.get(row.id),
             )
             for row in rows
         ]

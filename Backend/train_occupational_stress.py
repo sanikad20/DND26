@@ -17,8 +17,10 @@ Target: target_tertile — Low / Moderate / High, built in the EDA notebook
         degenerate — it didn't, so it's unused here.
 
 Models compared: Logistic Regression vs Random Forest, 5-fold stratified
-        cross-validation on an 80/20 train/test split. Logistic Regression
-        won on every metric (see printed results) and is what's shipped.
+        cross-validation on an 80/20 train/test split. Metrics reported:
+        accuracy, macro precision/recall/F1, macro-averaged one-vs-rest
+        ROC-AUC, and the confusion matrix. Logistic Regression won on every
+        metric (see printed results) and is what's shipped.
 
 Run:
         cd Backend
@@ -44,6 +46,7 @@ from sklearn.metrics import (
     accuracy_score,
     confusion_matrix,
     precision_recall_fscore_support,
+    roc_auc_score,
 )
 from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -51,6 +54,7 @@ from sklearn.preprocessing import StandardScaler
 DATA_PATH = "../occupational_stress_with_target.csv"
 FEATURES = ["demandmedia", "controlmedia", "supportmedia", "effortmedia", "rewardmedia"]
 TARGET = "target_tertile"
+CLASS_ORDER = ["Low", "Moderate", "High"]
 RANDOM_STATE = 42
 
 OUT_MODEL = "occupational_lr_model.pkl"
@@ -85,8 +89,22 @@ def compare_models(X_train, X_test, y_train, y_test):
         cv_scores = cross_val_score(model, X_train_s, y_train, cv=skf, scoring="accuracy")
         model.fit(X_train_s, y_train)
         pred = model.predict(X_test_s)
+        proba = model.predict_proba(X_test_s)
+
         test_acc = accuracy_score(y_test, pred)
         precision, recall, f1, _ = precision_recall_fscore_support(y_test, pred, average="macro")
+
+        # Macro one-vs-rest ROC-AUC for the 3-way classifier. Explicitly pass
+        # labels=CLASS_ORDER so the column order of `proba` (which follows
+        # model.classes_) is guaranteed to line up with y_test's labels
+        # regardless of how sklearn happened to sort the classes.
+        roc_auc = roc_auc_score(
+            y_test,
+            proba,
+            multi_class="ovr",
+            average="macro",
+            labels=list(model.classes_),
+        )
 
         results[name] = dict(
             cv_mean=cv_scores.mean(),
@@ -95,13 +113,14 @@ def compare_models(X_train, X_test, y_train, y_test):
             precision=precision,
             recall=recall,
             f1=f1,
+            roc_auc=roc_auc,
         )
 
         print(f"{name}:")
         for k, v in results[name].items():
             print(f"  {k}: {v:.4f}")
         print("  confusion matrix (Low, Moderate, High):")
-        print(" ", confusion_matrix(y_test, pred, labels=["Low", "Moderate", "High"]))
+        print(" ", confusion_matrix(y_test, pred, labels=CLASS_ORDER))
         print()
 
     winner = max(results, key=lambda n: results[n]["test_acc"])

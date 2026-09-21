@@ -2,6 +2,7 @@ from datetime import datetime
 
 from ml.occupational_model import OccupationalStressModel
 from repositories.occupational_repository import OccupationalRepository
+from repositories.wellness_plan_repository import WellnessPlanRepository
 from schemas.occupational import (
     AssessmentResult,
     HistoryResponse,
@@ -114,15 +115,20 @@ class OccupationalService:
         model: OccupationalStressModel,
         recommendations: RecommendationService,
         repository: OccupationalRepository,
+        plan_repository: WellnessPlanRepository | None = None,
     ):
         self._model = model
         self._recommendations = recommendations
         self._repository = repository
+        # Optional for backward compatibility with any existing call sites
+        # that construct OccupationalService without it; the route factory
+        # below always passes one in.
+        self._plan_repository = plan_repository or WellnessPlanRepository()
 
     def get_questionnaire(self) -> dict:
         return {"questions": QUESTIONNAIRE, "count": len(QUESTIONNAIRE)}
 
-    def assess(self, answers: OccupationalAnswers) -> AssessmentResult:
+    def assess(self, answers: OccupationalAnswers, firebase_uid: str) -> AssessmentResult:
         model_output = self._model.predict(answers)
         score = self._apply_context_nudge(
             base_score=model_output.base_score,
@@ -135,7 +141,21 @@ class OccupationalService:
         )
         context_contributors = self._recommendations.context_contributors(answers)
 
-        result = AssessmentResult(
+        recommendation_items = self._recommendations.build_recommendation_items(
+            model_contributors, context_contributors
+        )
+        plan_items = self._recommendations.build_plan(
+            model_output.risk_level,
+            model_contributors,
+            context_contributors,
+        )
+
+        # id/plan_id are filled in below, after the assessment row (and its
+        # matching plan) actually exist - save_assessment only needs the
+        # fields already set here.
+        draft = AssessmentResult(
+            id=0,
+            plan_id=0,
             risk_level=model_output.risk_level,
             score=score,
             model_contributors=model_contributors,
@@ -146,20 +166,24 @@ class OccupationalService:
             recommendations=self._recommendations.build_recommendations(
                 model_contributors, context_contributors
             ),
-            recommendation_items=self._recommendations.build_recommendation_items(
-                model_contributors, context_contributors
-            ),
-            plan=self._recommendations.build_plan(
-                model_output.risk_level,
-                model_contributors,
-                context_contributors,
-            ),
+            recommendation_items=recommendation_items,
+            plan=plan_items,
             model_version=self._model.model_version,
             placeholder_scoring=False,
             generated_at=datetime.utcnow().isoformat(),
         )
-        self._repository.save_assessment(answers, result)
-        return result
+
+        saved_assessment = self._repository.save_assessment(
+            answers,
+            draft,
+            firebase_uid=firebase_uid,
+        )
+        plan_row = self._plan_repository.create_plan(
+            assessment_id=saved_assessment.id,
+            firebase_uid=firebase_uid,
+        )
+
+        return draft.model_copy(update={"id": saved_assessment.id, "plan_id": plan_row.id})
 
     def get_history(self, firebase_uid: str) -> HistoryResponse:
         return self._repository.get_history(firebase_uid)
@@ -174,7 +198,7 @@ class OccupationalService:
 
         Can move the score up (strain) or down (protective), never by more
         than +/-15, and can never lift a Low result into High territory.
-        The risk LABEL is never touched here — it always comes from the model.
+        The risk LABEL is never touched here - it always comes from the model.
         The point weights are hand-set placeholders, not learned from data.
         """
         nudge = 0.0

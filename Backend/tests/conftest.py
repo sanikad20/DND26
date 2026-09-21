@@ -11,14 +11,13 @@ _TMP_DIR = tempfile.mkdtemp(prefix="brainlag_tests_")
 os.environ["DATABASE_URL"] = "sqlite:///" + (Path(_TMP_DIR) / "test.db").as_posix()
 
 import pytest  # noqa: E402
-from fastapi import FastAPI  # noqa: E402
+from fastapi import FastAPI, Header, HTTPException  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 
 def make_answers(**overrides) -> dict:
     """A neutral 'all 3s' respondent; override any field per test."""
     base = dict(
-        firebase_uid="test-user",
         duty_hours_per_day=8,
         night_duties_last_2wks=2,
         consecutive_days_no_rest=3,
@@ -34,6 +33,22 @@ def make_answers(**overrides) -> dict:
     )
     base.update(overrides)
     return base
+
+
+def auth_header(uid: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer uid:{uid}"}
+
+
+def fake_current_uid(authorization: str | None = Header(default=None)) -> str:
+    if authorization is None:
+        raise HTTPException(status_code=401, detail="Missing authorization token")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token.startswith("uid:"):
+        raise HTTPException(status_code=401, detail="Invalid or expired authorization token")
+    uid = token.removeprefix("uid:")
+    if not uid or uid in {"invalid", "expired"}:
+        raise HTTPException(status_code=401, detail="Invalid or expired authorization token")
+    return uid
 
 
 # Three personas for the Day 3 "contributor direction" check.
@@ -83,10 +98,12 @@ def occ_client():
     from database import Base, engine
     import models  # noqa: F401
     from api.routes.occupational import router
+    from core.firebase_auth import get_current_uid
 
     Base.metadata.create_all(bind=engine)
     app = FastAPI()
     app.include_router(router)
+    app.dependency_overrides[get_current_uid] = fake_current_uid
     return TestClient(app)
 
 

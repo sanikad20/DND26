@@ -12,6 +12,11 @@ class Settings:
         for origin in os.getenv("CORS_ORIGINS", "*").split(",")
         if origin.strip()
     ]
+    firebase_service_account_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+    firebase_service_account_json_base64 = os.getenv(
+        "FIREBASE_SERVICE_ACCOUNT_JSON_BASE64"
+    )
+    firebase_project_id = os.getenv("FIREBASE_PROJECT_ID")
 
     occupational_model_version = "lr-day2-v1"
     occupational_model_path = backend_dir / "occupational_lr_model.pkl"

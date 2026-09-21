@@ -1,21 +1,30 @@
 class OccupationalHistoryPoint {
+  final int id;
   final DateTime timestamp;
   final int score;
   final String riskLevel;
+  /// null only for assessments saved before wellness_plans existed.
+  final int? planId;
 
   const OccupationalHistoryPoint({
+    required this.id,
     required this.timestamp,
     required this.score,
     required this.riskLevel,
+    this.planId,
   });
 
   factory OccupationalHistoryPoint.fromJson(Map<String, dynamic> data) {
     return OccupationalHistoryPoint(
+      id: int.tryParse(data['id'].toString()) ?? 0,
       timestamp:
           DateTime.tryParse(data['timestamp']?.toString() ?? '') ??
           DateTime.now(),
       score: int.tryParse(data['score'].toString()) ?? 0,
       riskLevel: data['risk_level']?.toString() ?? 'Unknown',
+      planId: data['plan_id'] == null
+          ? null
+          : int.tryParse(data['plan_id'].toString()),
     );
   }
 }

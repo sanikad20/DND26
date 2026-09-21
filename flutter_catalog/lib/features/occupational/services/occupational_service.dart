@@ -2,6 +2,7 @@ import '../../../core/network/api_client.dart';
 import '../models/occupational_answers.dart';
 import '../models/occupational_assessment_result.dart';
 import '../models/occupational_history.dart';
+import '../models/occupational_plan_progress_response.dart';
 
 class OccupationalService {
   OccupationalService({ApiClient? apiClient})
@@ -40,11 +41,35 @@ class OccupationalService {
     return texts;
   }
 
-  Future<OccupationalHistory> getHistory(String firebaseUid) async {
+  Future<OccupationalHistory> getHistory() async {
     final data = await _apiClient.getJson(
-      '/occupational/history/$firebaseUid',
+      '/occupational/history',
       timeout: const Duration(seconds: 30),
     );
     return OccupationalHistory.fromJson(data);
+  }
+
+  /// Fetches per-day completion state for a specific plan (one plan per
+  /// assessment - see AssessmentResult.planId).
+  Future<OccupationalPlanProgressResponse> getPlanProgress(int planId) async {
+    final data = await _apiClient.getJson(
+      '/occupational/plans/$planId/progress',
+      timeout: const Duration(seconds: 15),
+    );
+    return OccupationalPlanProgressResponse.fromJson(data);
+  }
+
+  /// Marks a single day of a specific plan complete/incomplete. Scoped to
+  /// planId so toggling a day on one assessment's plan never touches any
+  /// other assessment's plan.
+  Future<void> setPlanDayCompleted(
+    int planId,
+    int dayNumber,
+    bool completed,
+  ) async {
+    await _apiClient.postJson('/occupational/plans/$planId/progress', {
+      'day_number': dayNumber,
+      'completed': completed,
+    }, timeout: const Duration(seconds: 15));
   }
 }

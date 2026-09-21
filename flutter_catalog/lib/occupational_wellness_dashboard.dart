@@ -17,8 +17,13 @@ class OccupationalWellnessDashboard extends StatefulWidget {
 class _OccupationalWellnessDashboardState
     extends State<OccupationalWellnessDashboard> {
   OccupationalAssessmentResult? _latestAssessment;
-  final OccupationalPlanProgress _planProgress =
-      OccupationalPlanProgress.instance;
+  // Only exists once we have an assessment from THIS session to scope it
+  // to (needs a plan_id - see OccupationalWellnessPlanScreen). A past
+  // assessment surfaced only via history has no full plan/recommendation
+  // detail attached (the history endpoint intentionally stays lightweight),
+  // so there's nothing to build progress tracking against until the
+  // backend grows a "fetch one assessment's full detail" endpoint.
+  OccupationalPlanProgress? _planProgress;
 
   OccupationalHistory? _history;
   bool _historyLoading = true;
@@ -30,8 +35,6 @@ class _OccupationalWellnessDashboardState
   @override
   void initState() {
     super.initState();
-    _planProgress.addListener(_refreshPlanState);
-    _loadLocalState();
     _loadBurnoutHistory();
     _loadHistory();
   }
@@ -44,16 +47,18 @@ class _OccupationalWellnessDashboardState
 
   @override
   void dispose() {
-    _planProgress.removeListener(_refreshPlanState);
+    _planProgress?.removeListener(_refreshPlanState);
     super.dispose();
   }
 
-  Future<void> _loadLocalState() async {
-    final assessment = await OccupationalAssessmentStore.instance
-        .loadLatestAssessment();
-    await _planProgress.load();
-    if (!mounted) return;
-    setState(() => _latestAssessment = assessment);
+  /// Attaches a fresh OccupationalPlanProgress scoped to this assessment's
+  /// plan_id, replacing (and unsubscribing from) any previous one.
+  void _attachPlanProgress(OccupationalAssessmentResult assessment) {
+    _planProgress?.removeListener(_refreshPlanState);
+    final progress = OccupationalPlanProgress(planId: assessment.planId);
+    progress.addListener(_refreshPlanState);
+    progress.load();
+    _planProgress = progress;
   }
 
   Future<void> _loadHistory() async {
@@ -71,7 +76,7 @@ class _OccupationalWellnessDashboardState
       return;
     }
     try {
-      final history = await ApiService.instance.getOccupationalHistory(uid);
+      final history = await ApiService.instance.getOccupationalHistory();
       if (!mounted) return;
       setState(() {
         _history = history;
@@ -97,6 +102,7 @@ class _OccupationalWellnessDashboardState
         builder: (_) => OccupationalConsentScreen(
           onAssessmentComplete: (assessment) {
             setState(() => _latestAssessment = assessment);
+            _attachPlanProgress(assessment);
             _loadHistory();
           },
         ),
@@ -105,6 +111,7 @@ class _OccupationalWellnessDashboardState
 
     if (result != null && mounted) {
       setState(() => _latestAssessment = result);
+      _attachPlanProgress(result);
       _loadHistory();
     }
   }
@@ -184,7 +191,18 @@ class _OccupationalWellnessDashboardState
   @override
   Widget build(BuildContext context) {
     final result = _latestAssessment;
-    final riskColor = _riskColor(result?.riskLevel);
+    // Fall back to the most recent history point for the summary card so a
+    // returning user (no in-session assessment yet) still sees their last
+    // score/risk instead of "Not assessed". History only carries the
+    // lightweight fields (score, risk_level, timestamp) - not the full
+    // recommendation/plan detail, so this fallback is display-only.
+    final latestHistoryPoint = (_history?.assessments.isNotEmpty ?? false)
+        ? _history!.assessments.last
+        : null;
+    final displayRiskLevel = result?.riskLevel ?? latestHistoryPoint?.riskLevel;
+    final displayScore = result?.score ?? latestHistoryPoint?.score;
+    final displayDate = result?.generatedAt ?? latestHistoryPoint?.timestamp;
+    final riskColor = _riskColor(displayRiskLevel);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0F),
@@ -225,9 +243,9 @@ class _OccupationalWellnessDashboardState
                       final summary = _DashboardPanel(
                         title: 'Current assessment',
                         child: _CurrentAssessmentCard(
-                          riskLevel: result?.riskLevel ?? 'Not assessed',
-                          score: result?.score,
-                          generatedAt: _formatDate(result?.generatedAt),
+                          riskLevel: displayRiskLevel ?? 'Not assessed',
+                          score: displayScore,
+                          generatedAt: _formatDate(displayDate),
                           riskColor: riskColor,
                           onStart: _openAssessment,
                         ),
@@ -267,15 +285,26 @@ class _OccupationalWellnessDashboardState
                         title: 'Quick insights',
                         child: _InsightList(result: result),
                       );
-                      final planTotal = buildOccupationalPlanDays(result).length;
+                      final planTotal = buildOccupationalPlanDays(
+                        result,
+                      ).length;
+                      final planProgress = _planProgress;
                       final plan = _DashboardPanel(
                         title: planTotal < 7 ? 'Maintain plan' : '7-day plan',
-                        child: _PlanSummary(
-                          total: planTotal,
-                          completed: _planProgress.completedCount,
-                          started: _planProgress.started,
-                          onContinue: _openPlan,
-                        ),
+                        child: result == null
+                            ? _PlanSummary(
+                                total: planTotal,
+                                completed: 0,
+                                started: false,
+                                onContinue: _openAssessment,
+                                continueLabel: 'Take assessment',
+                              )
+                            : _PlanSummary(
+                                total: planTotal,
+                                completed: planProgress?.completedCount ?? 0,
+                                started: planProgress?.started ?? false,
+                                onContinue: _openPlan,
+                              ),
                       );
                       if (!wide) {
                         return Column(
@@ -559,12 +588,14 @@ class _PlanSummary extends StatelessWidget {
   final int completed;
   final bool started;
   final VoidCallback onContinue;
+  final String continueLabel;
 
   const _PlanSummary({
     required this.total,
     required this.completed,
     required this.started,
     required this.onContinue,
+    this.continueLabel = 'Continue Plan',
   });
 
   @override
@@ -573,7 +604,7 @@ class _PlanSummary extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         LinearProgressIndicator(
-          value: completed / total,
+          value: total == 0 ? 0 : completed / total,
           minHeight: 8,
           borderRadius: BorderRadius.circular(20),
           backgroundColor: Colors.white10,
@@ -587,7 +618,7 @@ class _PlanSummary extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           started
-              ? 'Continue the same local plan from your latest assessment.'
+              ? 'Continue the plan from your latest assessment.'
               : 'Start the plan after your assessment, then mark each day complete.',
           style: const TextStyle(color: Colors.white54, height: 1.35),
         ),
@@ -597,7 +628,7 @@ class _PlanSummary extends StatelessWidget {
           child: OutlinedButton.icon(
             onPressed: onContinue,
             icon: const Icon(Icons.calendar_today_outlined),
-            label: const Text('Continue Plan'),
+            label: Text(continueLabel),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
               side: const BorderSide(color: Colors.white24),
@@ -922,10 +953,10 @@ class _TrendsAtAGlance extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final burnoutValues = burnout.map((p) => p.score).toList();
-    final occupationalValues = (occupational?.assessments ??
-            const <OccupationalHistoryPoint>[])
-        .map((p) => p.score.toDouble())
-        .toList();
+    final occupationalValues =
+        (occupational?.assessments ?? const <OccupationalHistoryPoint>[])
+            .map((p) => p.score.toDouble())
+            .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

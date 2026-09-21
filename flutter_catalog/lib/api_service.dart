@@ -43,7 +43,7 @@ class ApiService {
     return _occupationalService.getQuestionTexts();
   }
 
-  Future<OccupationalHistory> getOccupationalHistory(String firebaseUid) {
-    return _occupationalService.getHistory(firebaseUid);
+  Future<OccupationalHistory> getOccupationalHistory() {
+    return _occupationalService.getHistory();
   }
 }

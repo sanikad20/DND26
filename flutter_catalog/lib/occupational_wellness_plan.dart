@@ -23,18 +23,25 @@ class OccupationalWellnessPlanScreen extends StatefulWidget {
 
 class _OccupationalWellnessPlanScreenState
     extends State<OccupationalWellnessPlanScreen> {
-  final OccupationalPlanProgress _progress = OccupationalPlanProgress.instance;
+  // Null when this screen was opened without an assessment (nothing to
+  // scope progress to yet - there's no plan_id without one).
+  OccupationalPlanProgress? _progress;
 
   @override
   void initState() {
     super.initState();
-    _progress.addListener(_refresh);
-    _progress.load();
+    final planId = widget.assessment?.planId;
+    if (planId != null) {
+      final progress = OccupationalPlanProgress(planId: planId);
+      progress.addListener(_refresh);
+      progress.load();
+      _progress = progress;
+    }
   }
 
   @override
   void dispose() {
-    _progress.removeListener(_refresh);
+    _progress?.removeListener(_refresh);
     super.dispose();
   }
 
@@ -44,11 +51,12 @@ class _OccupationalWellnessPlanScreenState
 
   @override
   Widget build(BuildContext context) {
+    final progress = _progress;
     final days = buildOccupationalPlanDays(widget.assessment);
     final totalDays = days.length;
     // Low risk gets a short "maintain" list instead of a full 7-day plan.
     final isMaintain = totalDays < 7;
-    final nextDay = _progress.nextOpenDay(totalDays);
+    final nextDay = progress?.nextOpenDay(totalDays) ?? 1;
     final riskLevel = widget.assessment?.riskLevel ?? 'Assessment pending';
 
     return Scaffold(
@@ -74,51 +82,78 @@ class _OccupationalWellnessPlanScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _PlanHeader(
-                    completed: _progress.completedCount,
-                    started: _progress.started,
-                    riskLevel: riskLevel,
-                    totalDays: totalDays,
-                    isMaintain: isMaintain,
-                    onStart: _progress.start,
-                    onNext: () => _progress.setDayCompleted(nextDay, true),
-                    onReset: _progress.resetForNewAssessment,
-                    nextDay: nextDay,
-                  ),
-                  const SizedBox(height: 18),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final twoColumns = constraints.maxWidth >= 780;
-                      return Wrap(
-                        spacing: 14,
-                        runSpacing: 14,
-                        children: days.map((day) {
-                          final completed = _progress.completedDays.contains(
-                            day.day,
-                          );
-                          return SizedBox(
-                            width: twoColumns
-                                ? (constraints.maxWidth - 14) / 2
-                                : constraints.maxWidth,
-                            child: OccupationalPlanDayCard(
-                              day: day,
-                              enabled: _progress.started,
-                              completed: completed,
-                              onChanged: (value) => _progress.setDayCompleted(
-                                day.day,
-                                value ?? false,
+                  if (progress == null)
+                    const _NoPlanNotice()
+                  else ...[
+                    _PlanHeader(
+                      completed: progress.completedCount,
+                      started: progress.started,
+                      riskLevel: riskLevel,
+                      totalDays: totalDays,
+                      isMaintain: isMaintain,
+                      onStart: progress.start,
+                      onNext: () => progress.setDayCompleted(nextDay, true),
+                      onReset: progress.resetProgress,
+                      nextDay: nextDay,
+                    ),
+                    const SizedBox(height: 18),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final twoColumns = constraints.maxWidth >= 780;
+                        return Wrap(
+                          spacing: 14,
+                          runSpacing: 14,
+                          children: days.map((day) {
+                            final completed = progress.completedDays.contains(
+                              day.day,
+                            );
+                            return SizedBox(
+                              width: twoColumns
+                                  ? (constraints.maxWidth - 14) / 2
+                                  : constraints.maxWidth,
+                              child: OccupationalPlanDayCard(
+                                day: day,
+                                enabled: progress.started,
+                                completed: completed,
+                                onChanged: (value) => progress.setDayCompleted(
+                                  day.day,
+                                  value ?? false,
+                                ),
                               ),
-                            ),
-                          );
-                        }).toList(),
-                      );
-                    },
-                  ),
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Shown if this screen is opened without an assessment to attach a plan
+/// to - there's no plan_id to load or save progress against.
+class _NoPlanNotice extends StatelessWidget {
+  const _NoPlanNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF17181D),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: const Text(
+        'Take an assessment first to get a wellness plan.',
+        style: TextStyle(color: Colors.white70),
       ),
     );
   }
@@ -193,7 +228,7 @@ class _PlanHeader extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Current risk context: $riskLevel. Progress is stored locally on this device.',
+                      'Current risk context: $riskLevel. Progress is saved to your account.',
                       style: const TextStyle(
                         color: Colors.white60,
                         height: 1.35,

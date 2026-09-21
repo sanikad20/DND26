@@ -12,7 +12,7 @@ from services import recommendation_service as rec_mod
 from services.occupational_service import QUESTIONNAIRE, OccupationalService
 from services.recommendation_service import RecommendationService
 
-from conftest import DUTY_STRAIN_ONLY, RELAXED, STRESSED, make_answers
+from conftest import DUTY_STRAIN_ONLY, RELAXED, STRESSED, auth_header, make_answers
 
 MODEL_LABELS = {
     "High workload",
@@ -24,7 +24,11 @@ MODEL_LABELS = {
 
 
 def assess(client, uid, **overrides):
-    r = client.post("/occupational/assess", json=make_answers(firebase_uid=uid, **overrides))
+    r = client.post(
+        "/occupational/assess",
+        json=make_answers(**overrides),
+        headers=auth_header(uid),
+    )
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -250,7 +254,7 @@ def test_weekly_trend(points, expected):
 def test_history_endpoint_round_trip(occ_client):
     uid = "history-user"
     assess(occ_client, uid, **STRESSED)
-    r = occ_client.get(f"/occupational/history/{uid}")
+    r = occ_client.get("/occupational/history", headers=auth_header(uid))
     assert r.status_code == 200
     body = r.json()
     assert len(body["assessments"]) == 1
@@ -260,8 +264,84 @@ def test_history_endpoint_round_trip(occ_client):
 
 def test_history_is_private_per_user(occ_client):
     assess(occ_client, "user-one", **STRESSED)
-    body = occ_client.get("/occupational/history/user-two").json()
+    body = occ_client.get("/occupational/history", headers=auth_header("user-two")).json()
     assert body["assessments"] == []
+
+
+def test_assessment_requires_authorization_header(occ_client):
+    r = occ_client.post("/occupational/assess", json=make_answers())
+    assert r.status_code == 401
+
+
+@pytest.mark.parametrize("authorization", ["Bearer invalid", "Bearer uid:expired"])
+def test_assessment_rejects_invalid_or_expired_token(occ_client, authorization):
+    r = occ_client.post(
+        "/occupational/assess",
+        json=make_answers(),
+        headers={"Authorization": authorization},
+    )
+    assert r.status_code == 401
+
+
+def test_assessment_uses_verified_uid_not_client_supplied_uid(occ_client):
+    r = occ_client.post(
+        "/occupational/assess",
+        json={**make_answers(), "firebase_uid": "attacker-uid"},
+        headers=auth_header("verified-user"),
+    )
+    assert r.status_code == 200, r.text
+
+    verified = occ_client.get(
+        "/occupational/history",
+        headers=auth_header("verified-user"),
+    ).json()
+    attacker = occ_client.get(
+        "/occupational/history",
+        headers=auth_header("attacker-uid"),
+    ).json()
+
+    assert len(verified["assessments"]) == 1
+    assert attacker["assessments"] == []
+
+
+def test_user_cannot_access_another_users_wellness_plan(occ_client):
+    plan_id = assess(occ_client, "plan-owner", **STRESSED)["plan_id"]
+    r = occ_client.get(
+        f"/occupational/plans/{plan_id}",
+        headers=auth_header("different-user"),
+    )
+    assert r.status_code == 403
+
+
+def test_user_cannot_access_another_users_plan_progress(occ_client):
+    plan_id = assess(occ_client, "progress-owner", **STRESSED)["plan_id"]
+    r = occ_client.get(
+        f"/occupational/plans/{plan_id}/progress",
+        headers=auth_header("different-user"),
+    )
+    assert r.status_code == 403
+
+
+def test_user_cannot_update_another_users_plan_progress(occ_client):
+    plan_id = assess(occ_client, "progress-update-owner", **STRESSED)["plan_id"]
+    r = occ_client.post(
+        f"/occupational/plans/{plan_id}/progress",
+        json={"day_number": 1, "completed": True},
+        headers=auth_header("different-user"),
+    )
+    assert r.status_code == 403
+
+
+def test_owner_can_update_plan_progress(occ_client):
+    uid = "progress-owner-success"
+    plan_id = assess(occ_client, uid, **STRESSED)["plan_id"]
+    r = occ_client.post(
+        f"/occupational/plans/{plan_id}/progress",
+        json={"day_number": 1, "completed": True},
+        headers=auth_header(uid),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["completed"] is True
 
 
 def test_questionnaire_endpoint_serves_twelve_questions(occ_client):

@@ -38,6 +38,13 @@ class OccupationalRecommendation {
 }
 
 class OccupationalAssessmentResult {
+  /// DB id of the saved assessment row. Lets the app tell this result apart
+  /// from any other assessment the same person has taken.
+  final int id;
+  /// id of the wellness_plans row created for this assessment. Every plan
+  /// progress call (OccupationalPlanProgress) is scoped to this id, so
+  /// completing days on one assessment's plan never touches another's.
+  final int planId;
   final String riskLevel;
   final int score;
   final List<OccupationalFactor> modelContributors;
@@ -53,6 +60,8 @@ class OccupationalAssessmentResult {
   final List<OccupationalPlanDay> plan;
 
   const OccupationalAssessmentResult({
+    required this.id,
+    required this.planId,
     required this.riskLevel,
     required this.score,
     required this.modelContributors,
@@ -95,6 +104,8 @@ class OccupationalAssessmentResult {
         .toList();
 
     return OccupationalAssessmentResult(
+      id: int.tryParse(data['id'].toString()) ?? 0,
+      planId: int.tryParse(data['plan_id'].toString()) ?? 0,
       riskLevel: data['risk_level']?.toString() ?? 'Unknown',
       score: int.tryParse(data['score'].toString()) ?? 0,
       modelContributors: modelItems,
@@ -111,6 +122,8 @@ class OccupationalAssessmentResult {
   }
 
   Map<String, dynamic> toJson() => {
+    'id': id,
+    'plan_id': planId,
     'risk_level': riskLevel,
     'score': score,
     'model_contributors': modelContributors

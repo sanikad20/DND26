@@ -38,8 +38,10 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
   double reward = 3;
 
   OccupationalAssessmentResult? _result;
-  final OccupationalPlanProgress _planProgress =
-      OccupationalPlanProgress.instance;
+  // Created once a result comes back from /assess, scoped to that
+  // assessment's own plan_id - not a shared singleton, so a new assessment
+  // never touches a previous one's progress.
+  OccupationalPlanProgress? _planProgress;
 
   // Question wording fetched from GET /occupational/questionnaire. Empty until
   // it loads (or if the request fails) — the built-in wording is the fallback.
@@ -48,8 +50,6 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
   @override
   void initState() {
     super.initState();
-    _planProgress.addListener(_refreshPlanState);
-    _planProgress.load();
     _loadQuestionTexts();
   }
 
@@ -66,7 +66,7 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
 
   @override
   void dispose() {
-    _planProgress.removeListener(_refreshPlanState);
+    _planProgress?.removeListener(_refreshPlanState);
     super.dispose();
   }
 
@@ -101,7 +101,6 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
     });
 
     final answers = OccupationalAnswers(
-      firebaseUid: uid,
       dutyHoursPerDay: dutyHoursPerDay,
       nightDutiesLast2wks: nightDutiesLast2wks,
       consecutiveDaysNoRest: consecutiveDaysNoRest,
@@ -119,14 +118,21 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
     try {
       final assessment = await ApiService.instance.assessOccupational(answers);
       if (!mounted) return;
-      await OccupationalAssessmentStore.instance.saveLatestAssessment(
-        assessment,
-      );
-      await _planProgress.resetForNewAssessment();
+      OccupationalAssessmentStore.instance.setLatestAssessment(assessment);
+
+      // Fresh assessment -> its own plan, tied to assessment.planId. No
+      // "reset" needed: this is a brand new plan with no progress yet, not
+      // a shared slot being overwritten.
+      _planProgress?.removeListener(_refreshPlanState);
+      final planProgress = OccupationalPlanProgress(planId: assessment.planId);
+      planProgress.addListener(_refreshPlanState);
+      await planProgress.load();
       if (!mounted) return;
+
       widget.onAssessmentComplete?.call(assessment);
       setState(() {
         _result = assessment;
+        _planProgress = planProgress;
       });
     } catch (e) {
       if (!mounted) return;
@@ -491,12 +497,15 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
                     _RecommendationsPanel(items: recommendations),
                     const SizedBox(height: 18),
                     _WellnessPlanPanel(
-                      started: _planProgress.started,
-                      completedDays: _planProgress.completedDays,
+                      // _planProgress is always set together with _result
+                      // (see _runAssessment), so it's non-null whenever
+                      // result != null here.
+                      started: _planProgress!.started,
+                      completedDays: _planProgress!.completedDays,
                       days: planDays,
-                      onStart: _planProgress.start,
+                      onStart: _planProgress!.start,
                       onOpenPlan: _openPlan,
-                      onToggleDay: _planProgress.setDayCompleted,
+                      onToggleDay: _planProgress!.setDayCompleted,
                     ),
                   ],
                   const SizedBox(height: 18),
@@ -818,7 +827,10 @@ class _QuestionnairePanel extends StatelessWidget {
           _LikertQuestionCard(
             number: 7,
             total: 12,
-            title: _t(7, 'How much control do you have over how and when you work?'),
+            title: _t(
+              7,
+              'How much control do you have over how and when you work?',
+            ),
             description: 'Rate your practical say in work timing and methods.',
             lowLabel: 'None',
             highLabel: 'A great deal',
@@ -829,7 +841,10 @@ class _QuestionnairePanel extends StatelessWidget {
           _LikertQuestionCard(
             number: 8,
             total: 12,
-            title: _t(8, 'How supported do you feel by supervisors or organisation?'),
+            title: _t(
+              8,
+              'How supported do you feel by supervisors or organisation?',
+            ),
             description: 'Think about practical and emotional support.',
             lowLabel: 'Not at all',
             highLabel: 'Fully',
@@ -851,7 +866,10 @@ class _QuestionnairePanel extends StatelessWidget {
           _LikertQuestionCard(
             number: 10,
             total: 12,
-            title: _t(10, 'How adequately recognised or rewarded is that effort?'),
+            title: _t(
+              10,
+              'How adequately recognised or rewarded is that effort?',
+            ),
             description: 'Include recognition, fairness, and perceived return.',
             lowLabel: 'Not at all',
             highLabel: 'Very well',
@@ -1026,7 +1044,7 @@ class _WellnessPlanPanel extends StatelessWidget {
   final bool started;
   final Set<int> completedDays;
   final List<OccupationalPlanDay> days;
-  final Future<void> Function() onStart;
+  final VoidCallback onStart;
   final VoidCallback onOpenPlan;
   final Future<void> Function(int day, bool selected) onToggleDay;
 

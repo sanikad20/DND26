@@ -19,6 +19,9 @@ __pycache__/
 *.pkl
 .env
 .env.*
+*service-account*.json
+*firebase-adminsdk*.json
+firebase-service-account*.json
 .venv/
 venv/
 env/

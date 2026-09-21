@@ -22,6 +22,9 @@ users.db
 # Environment variables
 .env
 .env.*
+*service-account*.json
+*firebase-adminsdk*.json
+firebase-service-account*.json
 
 # IDE
 .vscode/

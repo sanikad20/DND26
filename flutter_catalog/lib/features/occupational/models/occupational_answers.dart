@@ -1,5 +1,4 @@
 class OccupationalAnswers {
-  final String firebaseUid;
   final double dutyHoursPerDay;
   final double nightDutiesLast2wks;
   final double consecutiveDaysNoRest;
@@ -14,7 +13,6 @@ class OccupationalAnswers {
   final int reward;
 
   const OccupationalAnswers({
-    required this.firebaseUid,
     required this.dutyHoursPerDay,
     required this.nightDutiesLast2wks,
     required this.consecutiveDaysNoRest,
@@ -30,7 +28,6 @@ class OccupationalAnswers {
   });
 
   Map<String, dynamic> toJson() => {
-    'firebase_uid': firebaseUid,
     'duty_hours_per_day': dutyHoursPerDay,
     'night_duties_last_2wks': nightDutiesLast2wks,
     'consecutive_days_no_rest': consecutiveDaysNoRest,
