@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'home_screen.dart';
 import 'register_screen.dart';
+import 'theme/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -56,8 +57,9 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(e.message ?? 'Login failed')));
     } finally {
-      if (!mounted) return;
-      setState(() => isLoading = false);
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
 
@@ -67,33 +69,48 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       builder: (ctx) {
         bool sending = false;
+        final theme = Theme.of(ctx);
+        final isDark = ThemeController.instance.isDarkMode;
+        final primaryTextColor = isDark ? AppColors.darkTextPrimary : AppColors.lightPrimaryNavy;
+        final secondaryTextColor = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+
         return StatefulBuilder(
           builder: (ctx, setDialogState) => AlertDialog(
-            backgroundColor: Colors.white,
+            backgroundColor: theme.cardColor,
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20)),
-            title: const Text('Reset Password',
-                style: TextStyle(fontWeight: FontWeight.w700)),
-            content: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Text(
-                'Enter your registered email. We\'ll send a password reset link.',
-                style: TextStyle(color: Colors.black54, fontSize: 14),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Text(
+              'Reset Password',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: primaryTextColor,
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: resetCtrl,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Enter your registered email. We\'ll send a password reset link.',
+                  style: TextStyle(color: secondaryTextColor, fontSize: 14),
                 ),
-              ),
-            ]),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: resetCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                  ),
+                ),
+              ],
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel'),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: secondaryTextColor),
+                ),
               ),
               ElevatedButton(
                 onPressed: sending
@@ -102,33 +119,34 @@ class _LoginScreenState extends State<LoginScreen> {
                         final email = resetCtrl.text.trim();
                         if (email.isEmpty) return;
                         setDialogState(() => sending = true);
+                        final nav = Navigator.of(context);
+                        final messenger = ScaffoldMessenger.of(context);
                         try {
                           await FirebaseAuth.instance
                               .sendPasswordResetEmail(email: email);
                           if (!mounted) return;
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          nav.pop();
+                          messenger.showSnackBar(
                             const SnackBar(
-                                content: Text('Reset email sent! Check your inbox.')),
+                              content: Text('Reset email sent! Check your inbox.'),
+                            ),
                           );
                         } on FirebaseAuthException catch (e) {
                           setDialogState(() => sending = false);
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          messenger.showSnackBar(
                             SnackBar(content: Text(e.message ?? 'Could not send email')),
                           );
                         }
                       },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF45199D),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
                 child: sending
-                    ? const SizedBox(width: 18, height: 18,
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
                         child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2))
-                    : const Text('Send Link',
-                        style: TextStyle(color: Colors.white)),
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text('Send Link'),
               ),
             ],
           ),
@@ -146,102 +164,151 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = ThemeController.instance.isDarkMode;
+    final primaryTextColor = isDark ? AppColors.darkTextPrimary : AppColors.lightPrimaryNavy;
+    final secondaryTextColor = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    final mutedTextColor = isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F3F3),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF3F3F3),
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
-        title: const Text('Login', style: TextStyle(color: Colors.black)),
+        title: const Text('Login'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Center(
-          child: SingleChildScrollView(
-            child: Container(
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(22),
-                boxShadow: const [
-                  BoxShadow(blurRadius: 8, color: Colors.black12,
-                      offset: Offset(0, 3)),
-                ],
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Center(
+            child: SingleChildScrollView(
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: theme.dividerColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 12,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.asset(
+                        'assets/logo.png',
+                        width: 85,
+                        height: 85,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Welcome Back',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: primaryTextColor,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Sign in to your Veer Mitra account',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: secondaryTextColor,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    TextField(
+                      controller: emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        labelText: 'Email',
+                        prefixIcon: Icon(Icons.email_outlined, color: mutedTextColor),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    TextField(
+                      controller: passwordController,
+                      obscureText: obscurePassword,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        prefixIcon: Icon(Icons.lock_outline, color: mutedTextColor),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscurePassword
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            color: mutedTextColor,
+                          ),
+                          onPressed: () =>
+                              setState(() => obscurePassword = !obscurePassword),
+                        ),
+                      ),
+                    ),
+
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _showForgotPasswordDialog,
+                        child: const Text(
+                          'Forgot Password?',
+                          style: TextStyle(
+                            color: AppColors.saffronAccent,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: isLoading ? null : loginUser,
+                        child: isLoading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                ),
+                              )
+                            : const Text(
+                                'Login',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const RegisterScreen(),
+                        ),
+                      ),
+                      child: Text(
+                        "Don't have an account? Register",
+                        style: TextStyle(
+                          color: primaryTextColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: Column(children: [
-                Image.asset('assets/logo.png', width: 95, height: 95),
-                const SizedBox(height: 16),
-                const Text('Welcome Back',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 24),
-
-                TextField(
-                  controller: emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: 'Email',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                TextField(
-                  controller: passwordController,
-                  obscureText: obscurePassword,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14)),
-                    suffixIcon: IconButton(
-                      icon: Icon(obscurePassword
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined),
-                      onPressed: () =>
-                          setState(() => obscurePassword = !obscurePassword),
-                    ),
-                  ),
-                ),
-
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: _showForgotPasswordDialog,
-                    child: const Text('Forgot Password?',
-                        style: TextStyle(color: Color(0xFF45199D))),
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: isLoading ? null : loginUser,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF45199D),
-                      disabledBackgroundColor: const Color(0xFF45199D),
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                    ),
-                    child: isLoading
-                        ? const SizedBox(width: 22, height: 22,
-                            child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2.5))
-                        : const Text('Login',
-                            style: TextStyle(color: Colors.white)),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () => Navigator.push(context,
-                      MaterialPageRoute(
-                          builder: (_) => const RegisterScreen())),
-                  child: const Text("Don't have an account? Register"),
-                ),
-              ]),
             ),
           ),
         ),

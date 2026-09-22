@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'continuous_monitoring_screen.dart';
+import 'theme/app_theme.dart';
+import 'widgets/veer_mitra_app_bar.dart';
 
 class UsageAccessSetupScreen extends StatefulWidget {
   const UsageAccessSetupScreen({super.key});
@@ -77,108 +79,108 @@ class _UsageAccessSetupScreenState extends State<UsageAccessSetupScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = ThemeController.instance.isDarkMode;
+    final primaryTextColor = isDark ? AppColors.darkTextPrimary : AppColors.lightPrimaryNavy;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0F),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0B0B0F),
-        title: const Text(
-          'Settings Access',
-          style: TextStyle(color: Colors.white),
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: const Color(0xFF232325),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: isChecking
-                  ? const Row(
-                      children: [
-                        SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Checking usage access permission...',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
+      appBar: const VeerMitraAppBar(),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: theme.dividerColor),
+                ),
+                child: isChecking
+                    ? Row(
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: theme.colorScheme.primary,
                             ),
                           ),
-                        ),
-                      ],
-                    )
-                  : Text(
-                      accessGranted
-                          ? 'Usage access granted. You can now start continuous monitoring.'
-                          : 'Grant usage access from Android settings to begin continuous monitoring.',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                      ),
-                    ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: openUsageSettings,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF45199D),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: const Text(
-                  'Open Settings',
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: checkUsageAccessPermission,
-                child: const Text('Check Again'),
-              ),
-            ),
-            const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: accessGranted
-                    ? () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ContinuousMonitoringScreen(),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Text(
+                              'Checking usage access permission...',
+                              style: TextStyle(
+                                color: primaryTextColor,
+                                fontSize: 15,
+                              ),
+                            ),
                           ),
-                        );
-                      }
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2E7D32),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: const Text(
-                  'Start Continuous Monitoring',
-                  style: TextStyle(color: Colors.white),
+                        ],
+                      )
+                    : Text(
+                        accessGranted
+                            ? 'Usage access granted. You can now start continuous monitoring.'
+                            : 'Grant usage access from Android settings to begin continuous monitoring.',
+                        style: TextStyle(
+                          color: primaryTextColor,
+                          fontSize: 15,
+                          height: 1.4,
+                        ),
+                      ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: openUsageSettings,
+                  child: const Text(
+                    'Open Settings',
+                    style: TextStyle(fontSize: 16),
+                  ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: checkUsageAccessPermission,
+                  child: const Text('Check Again'),
+                ),
+              ),
+              const Spacer(),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: accessGranted
+                      ? () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ContinuousMonitoringScreen(),
+                            ),
+                          );
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.greenAccent,
+                    disabledBackgroundColor: theme.dividerColor,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Start Continuous Monitoring',
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

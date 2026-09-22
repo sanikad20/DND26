@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'config/api_config.dart';
 import 'occupational_wellness_plan.dart';
+import 'theme/app_theme.dart';
+import 'widgets/veer_mitra_app_bar.dart';
 
 class OccupationalStressScreen extends StatefulWidget {
   final ValueChanged<OccupationalAssessmentResult>? onAssessmentComplete;
@@ -38,13 +40,8 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
   double reward = 3;
 
   OccupationalAssessmentResult? _result;
-  // Created once a result comes back from /assess, scoped to that
-  // assessment's own plan_id - not a shared singleton, so a new assessment
-  // never touches a previous one's progress.
   OccupationalPlanProgress? _planProgress;
 
-  // Question wording fetched from GET /occupational/questionnaire. Empty until
-  // it loads (or if the request fails) — the built-in wording is the fallback.
   Map<int, String> _questionTexts = const {};
 
   @override
@@ -58,10 +55,7 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
       final texts = await ApiService.instance.getOccupationalQuestionTexts();
       if (!mounted) return;
       setState(() => _questionTexts = texts);
-    } catch (_) {
-      // Keep the built-in wording; the assessment itself will surface any
-      // connectivity problem when the user submits.
-    }
+    } catch (_) {}
   }
 
   @override
@@ -85,8 +79,6 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
       return;
     }
 
-    // Assessments are stored per Firebase user, so never submit without one
-    // (a shared fallback id would mix strangers' history together).
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
       setState(() {
@@ -120,9 +112,6 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
       if (!mounted) return;
       OccupationalAssessmentStore.instance.setLatestAssessment(assessment);
 
-      // Fresh assessment -> its own plan, tied to assessment.planId. No
-      // "reset" needed: this is a brand new plan with no progress yet, not
-      // a shared slot being overwritten.
       _planProgress?.removeListener(_refreshPlanState);
       final planProgress = OccupationalPlanProgress(planId: assessment.planId);
       planProgress.addListener(_refreshPlanState);
@@ -207,13 +196,13 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
   Color _riskColor(String? riskLevel) {
     switch (riskLevel) {
       case 'Low':
-        return const Color(0xFF3DDC97);
+        return AppColors.riskLow;
       case 'Moderate':
-        return const Color(0xFFFFB020);
+        return AppColors.riskModerate;
       case 'High':
-        return const Color(0xFFFF6B6B);
+        return AppColors.riskHigh;
       default:
-        return const Color(0xFF8A5CE6);
+        return AppColors.saffronAccent;
     }
   }
 
@@ -240,8 +229,6 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
     }
     if (text.contains('duty hours')) return Icons.schedule_outlined;
     if (text.contains('night')) return Icons.dark_mode_outlined;
-    // Checked before 'recovery': "Limited family/social recovery time"
-    // contains both words.
     if (text.contains('family') || text.contains('social')) {
       return Icons.family_restroom_outlined;
     }
@@ -253,8 +240,6 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
     final result = _result;
     if (result == null) return const [];
 
-    // The backend is the source of truth for recommendations. The rules
-    // below only run for assessments saved by an older app version.
     final fromServer = result.recommendationItems
         .map(
           (item) => WellnessRecommendation(
@@ -388,24 +373,14 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
     final planDays = buildOccupationalPlanDays(result);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0F),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0B0B0F),
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text(
-          'Force Wellness Assessment',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-        ),
-        actions: [
+      appBar: VeerMitraAppBar(
+        showProfileButton: true,
+        extraActions: [
           if (_hasResult)
             TextButton.icon(
               onPressed: _returnToDashboard,
-              icon: const Icon(Icons.dashboard_outlined, color: Colors.white70),
-              label: const Text(
-                'Dashboard',
-                style: TextStyle(color: Colors.white70),
-              ),
+              icon: const Icon(Icons.dashboard_outlined),
+              label: const Text('Dashboard'),
             ),
         ],
       ),
@@ -497,9 +472,6 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
                     _RecommendationsPanel(items: recommendations),
                     const SizedBox(height: 18),
                     _WellnessPlanPanel(
-                      // _planProgress is always set together with _result
-                      // (see _runAssessment), so it's non-null whenever
-                      // result != null here.
                       started: _planProgress!.started,
                       completedDays: _planProgress!.completedDays,
                       days: planDays,
@@ -545,13 +517,15 @@ class _HeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF17181D),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white10),
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -560,34 +534,37 @@ class _HeaderCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF45199D).withValues(alpha: 0.22),
-                  borderRadius: BorderRadius.circular(14),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.health_and_safety_outlined,
-                  color: Color(0xFFBCA7FF),
+                  color: theme.colorScheme.primary,
                 ),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Occupational Wellness Check-In',
+                      'Occupational Stress & Wellness Assessment',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
+                        color: theme.textTheme.titleLarge?.color,
+                        fontSize: 20,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       'A focused self-report assessment for duty load, recovery, support, and work stress indicators.',
-                      style: TextStyle(color: Colors.white60, height: 1.35),
+                      style: TextStyle(
+                        color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
+                        height: 1.35,
+                      ),
                     ),
                   ],
                 ),
@@ -602,23 +579,18 @@ class _HeaderCard extends StatelessWidget {
               _StatusPill(
                 icon: Icons.list_alt_outlined,
                 label: '12 questions',
-                color: const Color(0xFF8A5CE6),
+                color: theme.colorScheme.primary,
               ),
               _StatusPill(
                 icon: Icons.psychology_alt_outlined,
-                label: hasResult ? 'Assessment ready' : 'Model decides risk',
-                color: const Color(0xFF3DDC97),
-              ),
-              _StatusPill(
-                icon: Icons.cloud_outlined,
-                label: apiBaseUrl,
-                color: const Color(0xFFFFB020),
+                label: hasResult ? 'Assessment ready' : 'Risk calculation model',
+                color: AppColors.riskLow,
               ),
               if (isLoading)
                 const _StatusPill(
                   icon: Icons.sync,
                   label: 'Running assessment',
-                  color: Color(0xFFFFB020),
+                  color: AppColors.saffronAccent,
                 ),
             ],
           ),
@@ -685,38 +657,42 @@ class _QuestionnairePanel extends StatelessWidget {
     required this.onRewardChanged,
   });
 
-  // Server wording for question [number], or the built-in wording.
   String _t(int number, String fallback) => questionTexts[number] ?? fallback;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return _Panel(
-      title: '12-question assessment',
+      title: '12-Question Assessment',
       subtitle:
-          'All answers remain self-reported. The backend returns the risk level.',
+          'Self-reported responses for duty workload and occupational experience.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: const LinearProgressIndicator(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
               value: 1,
-              minHeight: 8,
-              backgroundColor: Colors.white10,
-              color: Color(0xFF8A5CE6),
+              minHeight: 6,
+              backgroundColor: theme.dividerColor,
+              color: theme.colorScheme.primary,
             ),
           ),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Questionnaire ready: 12 of 12 values selected',
-            style: TextStyle(color: Colors.white54, fontSize: 13),
+            style: TextStyle(
+              color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+              fontSize: 13,
+            ),
           ),
           const SizedBox(height: 18),
           const _SectionHeader(
             icon: Icons.badge_outlined,
             title: 'Duty and recovery context',
             subtitle:
-                'These questions personalize explanations and practical wellness guidance.',
+                'Questions regarding your duty load and rest windows.',
           ),
           _RangeQuestionCard(
             number: 1,
@@ -811,7 +787,7 @@ class _QuestionnairePanel extends StatelessWidget {
             icon: Icons.assessment_outlined,
             title: 'Work experience indicators',
             subtitle:
-                'These map to validated police occupational-stress constructs used by the backend model.',
+                'Occupational stress constructs evaluated by the assessment model.',
           ),
           _LikertQuestionCard(
             number: 6,
@@ -905,9 +881,10 @@ class _ActionAndResultPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final assessment = result;
+
     return _Panel(
-      title: 'Current assessment',
-      subtitle: 'Risk level and score come directly from the FastAPI model.',
+      title: 'FORCE WELLNESS ASSESSMENT',
+      subtitle: 'Current Wellness Risk and score calculated by the model.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -942,19 +919,9 @@ class _ActionAndResultPanel extends StatelessWidget {
                         )
                       : const Icon(
                           Icons.play_arrow_rounded,
-                          color: Colors.white,
                         ),
                   label: Text(
                     isLoading ? 'Assessing...' : 'Assess',
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF45199D),
-                    disabledBackgroundColor: const Color(0xFF2D2450),
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
                   ),
                 ),
               ),
@@ -964,14 +931,6 @@ class _ActionAndResultPanel extends StatelessWidget {
                   onPressed: isLoading ? null : onReset,
                   icon: const Icon(Icons.refresh_rounded),
                   label: const Text('Reset'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white24),
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
                 ),
               ),
             ],
@@ -979,25 +938,25 @@ class _ActionAndResultPanel extends StatelessWidget {
           if (assessment != null) ...[
             const SizedBox(height: 18),
             _FactorSection(
-              title: 'Main contributors',
+              title: 'Key Contributors',
               icon: Icons.trending_up,
-              color: const Color(0xFFFF6B6B),
+              color: AppColors.riskHigh,
               items: assessment.modelContributors.map((e) => e.label).toList(),
             ),
             const SizedBox(height: 14),
             _FactorSection(
-              title: 'Context factors',
+              title: 'Context Factors',
               icon: Icons.info_outline,
-              color: const Color(0xFFFFB020),
+              color: AppColors.riskModerate,
               items: assessment.contextContributors
                   .map((e) => e.label)
                   .toList(),
             ),
             const SizedBox(height: 14),
             _FactorSection(
-              title: 'Protective factors',
+              title: 'Protective Factors',
               icon: Icons.shield_outlined,
-              color: const Color(0xFF3DDC97),
+              color: AppColors.riskLow,
               items: assessment.protectiveFactors,
             ),
           ],
@@ -1015,8 +974,8 @@ class _RecommendationsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _Panel(
-      title: 'Wellness recommendations',
-      subtitle: 'Practical next steps based on the latest contributors.',
+      title: 'Recommended Actions',
+      subtitle: 'Practical next steps based on the identified contributors.',
       child: LayoutBuilder(
         builder: (context, constraints) {
           final twoColumns = constraints.maxWidth >= 760;
@@ -1059,17 +1018,21 @@ class _WellnessPlanPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final completeCount = completedDays.length;
     final total = days.isEmpty ? 7 : days.length;
-    // Low risk gets a short "maintain" list instead of a full 7-day plan.
     final isMaintain = total < 7;
+
     return _Panel(
-      title: isMaintain ? 'Maintain plan' : '7-day wellness plan',
-      subtitle: 'Progress is saved on this device.',
+      title: isMaintain ? 'Maintain Plan' : '7-Day Wellness Plan',
+      subtitle: 'Interactive wellness actions.',
       trailing: started
           ? Text(
               '$completeCount / $total completed',
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(
+                color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
+                fontWeight: FontWeight.w600,
+              ),
             )
           : null,
       child: Column(
@@ -1077,10 +1040,10 @@ class _WellnessPlanPanel extends StatelessWidget {
         children: [
           LinearProgressIndicator(
             value: completeCount / total,
-            minHeight: 8,
-            borderRadius: BorderRadius.circular(20),
-            backgroundColor: Colors.white10,
-            color: const Color(0xFF3DDC97),
+            minHeight: 6,
+            borderRadius: BorderRadius.circular(10),
+            backgroundColor: theme.dividerColor,
+            color: AppColors.riskLow,
           ),
           const SizedBox(height: 16),
           if (!started) ...[
@@ -1088,20 +1051,9 @@ class _WellnessPlanPanel extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: onStart,
-                icon: const Icon(
-                  Icons.calendar_today_outlined,
-                  color: Colors.white,
-                ),
+                icon: const Icon(Icons.calendar_today_outlined),
                 label: Text(
                   isMaintain ? 'Start Maintain Plan' : 'Start 7-Day Plan',
-                  style: const TextStyle(color: Colors.white),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF45199D),
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
                 ),
               ),
             ),
@@ -1113,15 +1065,7 @@ class _WellnessPlanPanel extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: onOpenPlan,
                 icon: const Icon(Icons.open_in_new),
-                label: const Text('Open Full Plan'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  side: const BorderSide(color: Colors.white24),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
+                label: const Text('Open 7-Day Wellness Plan'),
               ),
             ),
             const SizedBox(height: 14),
@@ -1172,13 +1116,15 @@ class _Panel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF17181D),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white10),
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1192,18 +1138,19 @@ class _Panel extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
+                      style: TextStyle(
+                        color: theme.textTheme.titleMedium?.color,
+                        fontSize: 17,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                     if (subtitle != null) ...[
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 4),
                       Text(
                         subtitle!,
-                        style: const TextStyle(
-                          color: Colors.white54,
+                        style: TextStyle(
+                          color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.8),
+                          fontSize: 13,
                           height: 1.35,
                         ),
                       ),
@@ -1214,7 +1161,7 @@ class _Panel extends StatelessWidget {
               if (trailing != null) ...[const SizedBox(width: 12), trailing!],
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
           child,
         ],
       ),
@@ -1235,12 +1182,14 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12, top: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: const Color(0xFFBCA7FF), size: 22),
+          Icon(icon, color: theme.colorScheme.primary, size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -1248,17 +1197,17 @@ class _SectionHeader extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: theme.textTheme.titleMedium?.color,
                     fontSize: 15,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(
-                    color: Colors.white54,
+                  style: TextStyle(
+                    color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.8),
                     fontSize: 13,
                     height: 1.35,
                   ),
@@ -1301,6 +1250,8 @@ class _RangeQuestionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return _QuestionCard(
       number: number,
       total: total,
@@ -1313,8 +1264,8 @@ class _RangeQuestionCard extends StatelessWidget {
         max: max,
         divisions: divisions,
         label: value.round().toString(),
-        activeColor: const Color(0xFF8A5CE6),
-        inactiveColor: Colors.white12,
+        activeColor: theme.colorScheme.primary,
+        inactiveColor: theme.dividerColor,
         onChanged: enabled ? onChanged : null,
       ),
     );
@@ -1346,6 +1297,8 @@ class _LikertQuestionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return _QuestionCard(
       number: number,
       total: total,
@@ -1360,8 +1313,8 @@ class _LikertQuestionCard extends StatelessWidget {
             max: 5,
             divisions: 4,
             label: value.round().toString(),
-            activeColor: const Color(0xFF8A5CE6),
-            inactiveColor: Colors.white12,
+            activeColor: theme.colorScheme.primary,
+            inactiveColor: theme.dividerColor,
             onChanged: enabled ? onChanged : null,
           ),
           Padding(
@@ -1372,7 +1325,10 @@ class _LikertQuestionCard extends StatelessWidget {
                 Flexible(
                   child: Text(
                     lowLabel,
-                    style: const TextStyle(color: Colors.white38, fontSize: 12),
+                    style: TextStyle(
+                      color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
+                      fontSize: 12,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1380,7 +1336,10 @@ class _LikertQuestionCard extends StatelessWidget {
                   child: Text(
                     highLabel,
                     textAlign: TextAlign.right,
-                    style: const TextStyle(color: Colors.white38, fontSize: 12),
+                    style: TextStyle(
+                      color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ],
@@ -1411,13 +1370,18 @@ class _QuestionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF101116),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
+        color: theme.cardColor == AppColors.lightSurfaceCard
+            ? AppColors.lightSurfaceMuted
+            : AppColors.darkSurfaceMuted,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1427,17 +1391,17 @@ class _QuestionCard extends StatelessWidget {
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 7,
+                  horizontal: 9,
+                  vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF23213A),
-                  borderRadius: BorderRadius.circular(20),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   'Question $number of $total',
-                  style: const TextStyle(
-                    color: Color(0xFFBCA7FF),
+                  style: TextStyle(
+                    color: theme.colorScheme.primary,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1445,45 +1409,46 @@ class _QuestionCard extends StatelessWidget {
               ),
               const Spacer(),
               Container(
-                constraints: const BoxConstraints(minWidth: 58),
+                constraints: const BoxConstraints(minWidth: 50),
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 7,
+                  horizontal: 8,
+                  vertical: 4,
                 ),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(12),
+                  color: theme.colorScheme.primary,
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   valueLabel,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Text(
             title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
+            style: TextStyle(
+              color: textTheme.titleMedium?.color,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 3),
           Text(
             description,
-            style: const TextStyle(
-              color: Colors.white54,
+            style: TextStyle(
+              color: textTheme.bodySmall?.color?.withValues(alpha: 0.8),
               fontSize: 13,
               height: 1.35,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           child,
         ],
       ),
@@ -1504,52 +1469,63 @@ class _RiskSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Occupational Wellness Risk',
+          Text(
+            'Current Wellness Risk',
             style: TextStyle(
-              color: Colors.white70,
+              color: theme.textTheme.bodySmall?.color,
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Expanded(
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 child: Text(
-                  result.riskLevel,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 34,
-                    fontWeight: FontWeight.w900,
+                  result.riskLevel.toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
+              const Spacer(),
               Text(
-                '${result.score}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 34,
-                  fontWeight: FontWeight.w900,
+                'Score: ${result.score}',
+                style: TextStyle(
+                  color: theme.textTheme.titleLarge?.color,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 6),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
                 child: Text(
                   ' / 100',
-                  style: TextStyle(color: Colors.white54, fontSize: 14),
+                  style: TextStyle(
+                    color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                    fontSize: 14,
+                  ),
                 ),
               ),
             ],
@@ -1557,12 +1533,10 @@ class _RiskSummaryCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             message,
-            style: const TextStyle(color: Colors.white70, height: 1.42),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Model: ${result.modelVersion}  |  Real model scoring: ${!result.placeholderScoring}',
-            style: const TextStyle(color: Colors.white38, fontSize: 12),
+            style: TextStyle(
+              color: theme.textTheme.bodyMedium?.color,
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -1585,22 +1559,27 @@ class _FactorSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: theme.textTheme.titleMedium?.color,
             fontSize: 14,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: 9),
+        const SizedBox(height: 8),
         if (items.isEmpty)
-          const Text(
+          Text(
             'None flagged',
-            style: TextStyle(color: Colors.white38, fontSize: 13),
+            style: TextStyle(
+              color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
+              fontSize: 13,
+            ),
           )
         else
           Wrap(
@@ -1632,10 +1611,10 @@ class _ContributorChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.11),
-        borderRadius: BorderRadius.circular(18),
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
       child: Row(
@@ -1644,7 +1623,14 @@ class _ContributorChip extends StatelessWidget {
           Icon(icon, color: color, size: 14),
           const SizedBox(width: 6),
           Flexible(
-            child: Text(label, style: TextStyle(color: color, fontSize: 13)),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -1659,17 +1645,21 @@ class _RecommendationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF101116),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
+        color: theme.cardColor == AppColors.lightSurfaceCard
+            ? AppColors.lightSurfaceMuted
+            : AppColors.darkSurfaceMuted,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(item.icon, color: const Color(0xFFBCA7FF), size: 22),
+          Icon(item.icon, color: theme.colorScheme.primary, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1677,16 +1667,20 @@ class _RecommendationCard extends StatelessWidget {
               children: [
                 Text(
                   item.title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
+                  style: TextStyle(
+                    color: theme.textTheme.titleMedium?.color,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
                   item.body,
-                  style: const TextStyle(color: Colors.white60, height: 1.4),
+                  style: TextStyle(
+                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
                 ),
               ],
             ),
@@ -1702,29 +1696,34 @@ class _LoadingState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF101116),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.dividerColor),
       ),
-      child: const Row(
+      child: Row(
         children: [
           SizedBox(
-            width: 26,
-            height: 26,
+            width: 22,
+            height: 22,
             child: CircularProgressIndicator(
-              strokeWidth: 2.6,
-              color: Color(0xFFBCA7FF),
+              strokeWidth: 2,
+              color: theme.colorScheme.primary,
             ),
           ),
-          SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               'Running the occupational wellness model...',
-              style: TextStyle(color: Colors.white70, height: 1.4),
+              style: TextStyle(
+                color: theme.textTheme.bodyMedium?.color,
+                height: 1.4,
+              ),
             ),
           ),
         ],
@@ -1738,27 +1737,38 @@ class _EmptyResultState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF101116),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
+        color: theme.cardColor == AppColors.lightSurfaceCard
+            ? AppColors.lightSurfaceMuted
+            : AppColors.darkSurfaceMuted,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.dividerColor),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.insights_outlined, color: Color(0xFFBCA7FF)),
-          SizedBox(height: 10),
+          Icon(Icons.insights_outlined, color: theme.colorScheme.primary),
+          const SizedBox(height: 8),
           Text(
             'Complete the questionnaire and run the assessment.',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+            style: TextStyle(
+              color: theme.textTheme.titleMedium?.color,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             'Your result will show the current risk level, score, contributors, protective factors, recommendations, and a 7-day plan.',
-            style: TextStyle(color: Colors.white54, height: 1.4),
+            style: TextStyle(
+              color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.8),
+              fontSize: 13,
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -1777,21 +1787,21 @@ class _ErrorState extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF2A1515),
-        borderRadius: BorderRadius.circular(14),
+        color: AppColors.riskHigh.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFFFF6B6B).withValues(alpha: 0.35),
+          color: AppColors.riskHigh.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.error_outline, color: Color(0xFFFF6B6B), size: 20),
+          const Icon(Icons.error_outline, color: AppColors.riskHigh, size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(color: Colors.white70, height: 1.4),
+              style: const TextStyle(color: AppColors.riskHigh, height: 1.4),
             ),
           ),
         ],
@@ -1807,28 +1817,30 @@ class _Disclaimer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF111217),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white10),
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
+          Icon(
             Icons.privacy_tip_outlined,
-            color: Colors.white38,
-            size: 19,
+            color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
+            size: 18,
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
-                color: Colors.white54,
+              style: TextStyle(
+                color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
                 fontSize: 12,
                 height: 1.4,
               ),
@@ -1855,17 +1867,17 @@ class _StatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       constraints: const BoxConstraints(maxWidth: 360),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.30)),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 15),
-          const SizedBox(width: 7),
+          Icon(icon, color: color, size: 14),
+          const SizedBox(width: 6),
           Flexible(
             child: Text(
               label,
@@ -1873,7 +1885,7 @@ class _StatusPill extends StatelessWidget {
               style: TextStyle(
                 color: color,
                 fontSize: 12,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),

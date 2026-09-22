@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'usage_service.dart';
 import 'features/burnout/state/burnout_history_store.dart';
+import 'theme/app_theme.dart';
+import 'widgets/veer_mitra_app_bar.dart';
 
 class ContinuousMonitoringScreen extends StatefulWidget {
   const ContinuousMonitoringScreen({super.key});
@@ -28,7 +30,6 @@ class _ContinuousMonitoringScreenState
 
   Map<String, double>? _serverBaseline;
   Map<String, double>? _todayVsBaseline;
-
 
   Timer? _autoTimer;
   Timer? _liveTimer;
@@ -57,14 +58,14 @@ class _ContinuousMonitoringScreenState
     if (mounted) setState(() => _liveScreenTime = h);
   }
 
-  // ── Core load ─────────────────────────────────────────────────────────────
-
   Future<void> _loadAll() async {
     if (_isFetching) return;
-    if (mounted) setState(() {
-      _isFetching = true;
-      _statusMsg  = 'Reading 7-day Digital Wellbeing data…';
-    });
+    if (mounted) {
+      setState(() {
+        _isFetching = true;
+        _statusMsg  = 'Reading 7-day Digital Wellbeing data…';
+      });
+    }
 
     try {
       await UsageService.instance.getInstallDate();
@@ -72,24 +73,29 @@ class _ContinuousMonitoringScreenState
       final live    = await UsageService.instance.fetchLiveScreenTime();
 
       if (history.isEmpty) {
-        if (mounted) setState(() {
-          _statusMsg  = 'No usage data found.';
-          _isFetching = false;
-        });
+        if (mounted) {
+          setState(() {
+            _statusMsg  = 'No usage data found.';
+            _isFetching = false;
+          });
+        }
         return;
       }
 
       final baseline = UsageService.instance.baseline!;
 
-      if (mounted) setState(() {
-        _history        = history;
-        _baseline       = baseline;
-        _liveScreenTime = live;
-        _statusMsg      = 'Running burnout models…';
-      });
+      if (mounted) {
+        setState(() {
+          _history        = history;
+          _baseline       = baseline;
+          _liveScreenTime = live;
+          _statusMsg      = 'Running burnout models…';
+        });
+      }
 
-      // ── LSTM model ───────────────────────────────────────────────────────
-      if (mounted) setState(() => _statusMsg = 'Running LSTM personalised prediction…');
+      if (mounted) {
+        setState(() => _statusMsg = 'Running LSTM personalised prediction…');
+      }
 
       if (history.length >= 8) {
         try {
@@ -104,9 +110,6 @@ class _ContinuousMonitoringScreenState
           final screenHours = (liveHours > 0.1)
               ? liveHours
               : todayRaw.screenTimeHours;
-
-          print("TODAY screen used for LSTM: $screenHours "
-              "(live=$liveHours, raw=${todayRaw.screenTimeHours})");
 
           final todayUsage = DayUsage(
             screenTimeHours:    screenHours,
@@ -136,30 +139,40 @@ class _ContinuousMonitoringScreenState
             source: 'LSTM',
           );
 
-          if (mounted) setState(() {
-            _lstmScore       = result.score;
-            _lstmLevel       = result.level;
-            _serverBaseline  = result.personalBaseline;
-            _todayVsBaseline = result.todayVsBaseline;
-          });
+          if (mounted) {
+            setState(() {
+              _lstmScore       = result.score;
+              _lstmLevel       = result.level;
+              _serverBaseline  = result.personalBaseline;
+              _todayVsBaseline = result.todayVsBaseline;
+            });
+          }
 
         } catch (e, st) {
-          print("========== LSTM FAILED ==========");
-          print(e); print(st);
-          print("=================================");
+          debugPrint("========== LSTM FAILED ==========");
+          debugPrint(e.toString());
+          debugPrint(st.toString());
         }
       } else {
-        if (mounted) setState(() =>
-            _lstmLevel = 'Need ${8 - history.length + 1} more days for LSTM');
+        if (mounted) {
+          setState(() =>
+              _lstmLevel = 'Need ${8 - history.length + 1} more days for LSTM');
+        }
       }
 
-      if (mounted) setState(() =>
-          _statusMsg = 'Updated ${_fmt(DateTime.now())}  · ${history.length} days');
+      if (mounted) {
+        setState(() =>
+            _statusMsg = 'Updated ${_fmt(DateTime.now())}  · ${history.length} days');
+      }
 
     } catch (e) {
-      if (mounted) setState(() => _statusMsg = 'Error: $e');
+      if (mounted) {
+        setState(() => _statusMsg = 'Error: $e');
+      }
     } finally {
-      if (mounted) setState(() => _isFetching = false);
+      if (mounted) {
+        setState(() => _isFetching = false);
+      }
     }
   }
 
@@ -180,17 +193,9 @@ class _ContinuousMonitoringScreenState
         smsCount:           20.0,
       );
 
-  String _scoreToLevel(double s) {
-    if (s < 4) return 'Low 🟢';
-    if (s < 7) return 'Moderate 🟠';
-    return 'High 🔴';
-  }
-
   String _fmt(DateTime t) =>
       '${t.hour.toString().padLeft(2, '0')}:'
       '${t.minute.toString().padLeft(2, '0')}';
-
-  // ── Deviation alerts ──────────────────────────────────────────────────────
 
   List<String> get _alerts {
     if (_history.isEmpty || _baseline == null) return [];
@@ -203,44 +208,40 @@ class _ContinuousMonitoringScreenState
     final screenZ   = _todayVsBaseline?['screen_zscore']  ?? 0.0;
     final socialZ   = _todayVsBaseline?['social_zscore']  ?? 0.0;
 
-    if (liveScreen > b.thresholdScreenTime)
-      a.add('📱 Screen time ${liveScreen.toStringAsFixed(1)}h '
-          '> your threshold ${b.thresholdScreenTime.toStringAsFixed(1)}h');
-    if (screenZ.abs() > 1.5)
-      a.add('⚠️ Screen time is ${screenZ.toStringAsFixed(1)}σ '
-          '${screenZ > 0 ? "above" : "below"} your 7-day average');
-    if (socialZ.abs() > 1.5)
-      a.add('⚠️ Social usage is ${socialZ.toStringAsFixed(1)}σ '
-          '${socialZ > 0 ? "above" : "below"} your 7-day average');
-    if (d.socialAppRatio > b.thresholdSocialRatio)
-      a.add('📲 Social apps ${(d.socialAppRatio * 100).toStringAsFixed(0)}% '
-          '> your threshold ${(b.thresholdSocialRatio * 100).toStringAsFixed(0)}%');
-    if (d.appSwitchesPerHour > b.thresholdAppSwitches)
-      a.add('🔀 App switches ${d.appSwitchesPerHour}/hr '
-          '> your threshold ${b.thresholdAppSwitches}/hr');
+    if (liveScreen > b.thresholdScreenTime) {
+      a.add('📱 Screen time ${liveScreen.toStringAsFixed(1)}h > your threshold ${b.thresholdScreenTime.toStringAsFixed(1)}h');
+    }
+    if (screenZ.abs() > 1.5) {
+      a.add('⚠️ Screen time is ${screenZ.toStringAsFixed(1)}σ ${screenZ > 0 ? "above" : "below"} your 7-day average');
+    }
+    if (socialZ.abs() > 1.5) {
+      a.add('⚠️ Social usage is ${socialZ.toStringAsFixed(1)}σ ${socialZ > 0 ? "above" : "below"} your 7-day average');
+    }
+    if (d.socialAppRatio > b.thresholdSocialRatio) {
+      a.add('📲 Social apps ${(d.socialAppRatio * 100).toStringAsFixed(0)}% > your threshold ${(b.thresholdSocialRatio * 100).toStringAsFixed(0)}%');
+    }
+    if (d.appSwitchesPerHour > b.thresholdAppSwitches) {
+      a.add('🔀 App switches ${d.appSwitchesPerHour}/hr > your threshold ${b.thresholdAppSwitches}/hr');
+    }
     final liveDelta = liveScreen - avgScreen;
-    if (liveDelta > 1.5)
-      a.add('📈 Screen time up ${liveDelta.toStringAsFixed(1)}h '
-          'vs your 7-day avg (${avgScreen.toStringAsFixed(1)}h)');
+    if (liveDelta > 1.5) {
+      a.add('📈 Screen time up ${liveDelta.toStringAsFixed(1)}h vs your 7-day avg (${avgScreen.toStringAsFixed(1)}h)');
+    }
     return a;
   }
 
-  // ── Colours ───────────────────────────────────────────────────────────────
-
   Color _scoreColor(double s) {
-    if (s < 4) return Colors.green;
-    if (s < 7) return Colors.orange;
-    return Colors.red;
+    if (s < 4) return AppColors.riskLow;
+    if (s < 7) return AppColors.riskModerate;
+    return AppColors.riskHigh;
   }
 
   Color _levelColor(String l) {
-    if (l.contains('Low'))      return Colors.green;
-    if (l.contains('Moderate')) return Colors.orange;
-    if (l.contains('High'))     return Colors.red;
-    return Colors.white54;
+    if (l.contains('Low'))      return AppColors.riskLow;
+    if (l.contains('Moderate')) return AppColors.riskModerate;
+    if (l.contains('High'))     return AppColors.riskHigh;
+    return ThemeController.instance.isDarkMode ? AppColors.darkTextMuted : AppColors.lightTextMuted;
   }
-
-  // ── Widgets ───────────────────────────────────────────────────────────────
 
   Widget _card({
     required String   title,
@@ -249,146 +250,114 @@ class _ContinuousMonitoringScreenState
     Color?   valueColor,
     String?  subtitle,
     bool     highlight = false,
-  }) =>
-      Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: highlight ? const Color(0xFF2A1A0A) : const Color(0xFF232325),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-              color: highlight ? Colors.orange.withOpacity(0.5) : Colors.white12),
-        ),
-        child: Row(children: [
-          Icon(icon,
-              color: highlight ? Colors.orange : const Color(0xFF8A5CE6),
-              size: 22),
-          const SizedBox(width: 12),
-          Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title,
-                  style: const TextStyle(color: Colors.white70, fontSize: 14)),
-              if (subtitle != null)
-                Text(subtitle,
-                    style: const TextStyle(color: Colors.white38, fontSize: 11)),
-            ],
-          )),
-          Text(value,
-              style: TextStyle(
-                  color: valueColor ?? Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16)),
-        ]),
-      );
+  }) {
+    final theme = Theme.of(context);
+    final isDark = ThemeController.instance.isDarkMode;
+    final primaryTextColor = isDark ? AppColors.darkTextPrimary : AppColors.lightPrimaryNavy;
+    final mutedTextColor = isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted;
 
-  Widget _lstmScoreCard() => Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A2E),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFF8A5CE6).withOpacity(0.4)),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: highlight ? AppColors.saffronAccent.withValues(alpha: 0.08) : theme.cardColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: highlight ? AppColors.saffronAccent.withValues(alpha: 0.4) : theme.dividerColor,
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Row(children: [
-            Icon(Icons.health_and_safety_outlined,
-                color: Color(0xFF8A5CE6), size: 18),
-            SizedBox(width: 8),
-            Text("Today's Burnout Score  (LSTM 7-day)",
-                style: TextStyle(color: Color(0xFF8A5CE6),
-                    fontWeight: FontWeight.w700, fontSize: 14)),
-          ]),
-          const SizedBox(height: 16),
-          // Big score display
-          Center(
-            child: Column(children: [
-              Text(
-                _lstmScore != null ? '${_lstmScore!.toStringAsFixed(1)}/10' : '--',
-                style: TextStyle(
-                  color: _lstmScore != null ? _scoreColor(_lstmScore!) : Colors.white38,
-                  fontSize: 48, fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _levelColor(_lstmLevel).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: _levelColor(_lstmLevel).withOpacity(0.4)),
-                ),
-                child: Text(_lstmLevel,
-                    style: TextStyle(
-                        color: _levelColor(_lstmLevel),
-                        fontSize: 14, fontWeight: FontWeight.w600)),
-              ),
-            ]),
-          ),
-          const SizedBox(height: 4),
-          if (_todayVsBaseline != null) ...[
-            const SizedBox(height: 14),
-            const Divider(color: Colors.white12),
-            const SizedBox(height: 8),
-            const Text('Today vs Your 7-Day Average',
-                style: TextStyle(color: Colors.white54, fontSize: 11)),
-            const SizedBox(height: 8),
-            _deltaRow('Screen time',
-                _todayVsBaseline!['screen_time_delta'] ?? 0,
-                suffix: 'h', higherIsBad: true),
-            _deltaRow('Social usage',
-                (_todayVsBaseline!['social_ratio_delta'] ?? 0) * 100,
-                suffix: '%', higherIsBad: true),
-            _deltaRow('Work usage',
-                (_todayVsBaseline!['work_ratio_delta'] ?? 0) * 100,
-                suffix: '%', higherIsBad: false),
-            _deltaRow('Sleep',
-                _todayVsBaseline!['sleep_delta'] ?? 0,
-                suffix: 'h', higherIsBad: false),
+      ),
+      child: Row(children: [
+        Icon(icon, color: highlight ? AppColors.saffronAccent : primaryTextColor, size: 22),
+        const SizedBox(width: 14),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: TextStyle(color: primaryTextColor, fontSize: 14, fontWeight: FontWeight.w600)),
+            if (subtitle != null)
+              Text(subtitle, style: TextStyle(color: mutedTextColor, fontSize: 12)),
           ],
-        ]),
-      );
+        )),
+        Text(value, style: TextStyle(color: valueColor ?? primaryTextColor, fontWeight: FontWeight.w700, fontSize: 16)),
+      ]),
+    );
+  }
 
-  Widget _scoreBox(String label, double? score, String level) => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF232325),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(children: [
-          Text(label,
-              style: const TextStyle(color: Colors.white54, fontSize: 11)),
-          const SizedBox(height: 6),
-          Text(
-            score != null ? '${score.toStringAsFixed(1)}/10' : '--',
-            style: TextStyle(
-              color: score != null ? _scoreColor(score) : Colors.white38,
-              fontSize: 24, fontWeight: FontWeight.w800,
+  Widget _lstmScoreCard() {
+    final theme = Theme.of(context);
+    final isDark = ThemeController.instance.isDarkMode;
+    final primaryTextColor = isDark ? AppColors.darkTextPrimary : AppColors.lightPrimaryNavy;
+    final mutedTextColor = isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: primaryTextColor.withValues(alpha: 0.2)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.health_and_safety_outlined, color: primaryTextColor, size: 20),
+          const SizedBox(width: 8),
+          Text("Today's Burnout Score  (LSTM 7-day)",
+              style: TextStyle(color: primaryTextColor, fontWeight: FontWeight.w700, fontSize: 14)),
+        ]),
+        const SizedBox(height: 16),
+        Center(
+          child: Column(children: [
+            Text(
+              _lstmScore != null ? '${_lstmScore!.toStringAsFixed(1)}/10' : '--',
+              style: TextStyle(
+                color: _lstmScore != null ? _scoreColor(_lstmScore!) : mutedTextColor,
+                fontSize: 44, fontWeight: FontWeight.w900,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(level,
-              style: TextStyle(color: _levelColor(level), fontSize: 12),
-              textAlign: TextAlign.center),
-        ]),
-      );
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: _levelColor(_lstmLevel).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _levelColor(_lstmLevel).withValues(alpha: 0.3)),
+              ),
+              child: Text(_lstmLevel,
+                  style: TextStyle(color: _levelColor(_lstmLevel), fontSize: 14, fontWeight: FontWeight.w700)),
+            ),
+          ]),
+        ),
+        if (_todayVsBaseline != null) ...[
+          const SizedBox(height: 14),
+          Divider(color: theme.dividerColor),
+          const SizedBox(height: 8),
+          Text('Today vs Your 7-Day Average', style: TextStyle(color: mutedTextColor, fontSize: 12)),
+          const SizedBox(height: 8),
+          _deltaRow('Screen time', _todayVsBaseline!['screen_time_delta'] ?? 0, suffix: 'h', higherIsBad: true),
+          _deltaRow('Social usage', (_todayVsBaseline!['social_ratio_delta'] ?? 0) * 100, suffix: '%', higherIsBad: true),
+          _deltaRow('Work usage', (_todayVsBaseline!['work_ratio_delta'] ?? 0) * 100, suffix: '%', higherIsBad: false),
+          _deltaRow('Sleep', _todayVsBaseline!['sleep_delta'] ?? 0, suffix: 'h', higherIsBad: false),
+        ],
+      ]),
+    );
+  }
 
-  Widget _deltaRow(String label, double delta,
-      {required String suffix, required bool higherIsBad}) {
+  Widget _deltaRow(String label, double delta, {required String suffix, required bool higherIsBad}) {
+    final isDark = ThemeController.instance.isDarkMode;
+    final secondaryTextColor = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    final mutedTextColor = isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted;
+
     final isPositive = delta >= 0;
     final isBad      = higherIsBad ? isPositive : !isPositive;
     final color      = delta.abs() < 0.05
-        ? Colors.white38
-        : isBad ? Colors.redAccent : Colors.greenAccent;
+        ? mutedTextColor
+        : isBad ? AppColors.riskHigh : AppColors.riskLow;
     return Padding(
       padding: const EdgeInsets.only(bottom: 5),
       child: Row(children: [
-        Expanded(child: Text(label,
-            style: const TextStyle(color: Colors.white60, fontSize: 12))),
+        Expanded(child: Text(label, style: TextStyle(color: secondaryTextColor, fontSize: 13))),
         Text(
-          '${isPositive ? "▲" : "▼"} '
-          '${delta >= 0 ? "+" : ""}${delta.toStringAsFixed(suffix == "%" ? 0 : 1)}$suffix',
-          style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 12)),
+          '${isPositive ? "▲" : "▼"} ${delta >= 0 ? "+" : ""}${delta.toStringAsFixed(suffix == "%" ? 0 : 1)}$suffix',
+          style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13)),
       ]),
     );
   }
@@ -398,93 +367,58 @@ class _ContinuousMonitoringScreenState
     required List<FlSpot> spots,
     required double       maxY,
     bool    isInt   = false,
-    Color   color   = const Color(0xFF8A5CE6),
+    Color?  color,
     double? threshY,
     double? avgY,
   }) {
-    // Only show every other label when we have many points to avoid overlap
+    final theme = Theme.of(context);
+    final isDark = ThemeController.instance.isDarkMode;
+    final primaryTextColor = isDark ? AppColors.darkTextPrimary : AppColors.lightPrimaryNavy;
+    final mutedTextColor = isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted;
+    final chartColor = color ?? primaryTextColor;
     final showEvery = spots.length > 5 ? 2 : 1;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 16, 16, 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF232325),
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(
           padding: const EdgeInsets.only(left: 4),
-          child: Text(title, style: const TextStyle(
-              color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+          child: Text(title, style: TextStyle(color: primaryTextColor, fontSize: 15, fontWeight: FontWeight.w700)),
         ),
         const SizedBox(height: 14),
         spots.isEmpty
-            ? const Center(child: Padding(
-                padding: EdgeInsets.all(20),
-                child: Text('No data yet',
-                    style: TextStyle(color: Colors.white38))))
+            ? Center(child: Padding(padding: const EdgeInsets.all(20), child: Text('No data yet', style: TextStyle(color: mutedTextColor))))
             : SizedBox(
-                height: 220,
+                height: 200,
                 child: LineChart(LineChartData(
                   minX: 0,
                   maxX: (spots.length - 1).toDouble().clamp(1.0, 7.0),
                   minY: 0,
                   maxY: maxY,
-                  clipData: const FlClipData.all(), // prevent line clipping
+                  clipData: const FlClipData.all(),
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
                     horizontalInterval: maxY / 4,
-                    getDrawingHorizontalLine: (_) =>
-                        const FlLine(color: Colors.white12, strokeWidth: 1),
+                    getDrawingHorizontalLine: (_) => FlLine(color: theme.dividerColor, strokeWidth: 1),
                   ),
                   borderData: FlBorderData(show: false),
-                  extraLinesData: ExtraLinesData(horizontalLines: [
-                    if (threshY != null && threshY <= maxY)
-                      HorizontalLine(
-                        y: threshY,
-                        color: Colors.orange.withOpacity(0.8),
-                        strokeWidth: 1.5, dashArray: [6, 4],
-                        label: HorizontalLineLabel(
-                          show: true,
-                          alignment: Alignment.topRight,
-                          padding: const EdgeInsets.only(right: 4, bottom: 2),
-                          labelResolver: (_) => 'threshold',
-                          style: const TextStyle(
-                              color: Colors.orange, fontSize: 9),
-                        ),
-                      ),
-                    if (avgY != null && avgY <= maxY)
-                      HorizontalLine(
-                        y: avgY,
-                        color: Colors.green.withOpacity(0.6),
-                        strokeWidth: 1, dashArray: [4, 4],
-                        label: HorizontalLineLabel(
-                          show: true,
-                          alignment: Alignment.bottomRight,
-                          padding: const EdgeInsets.only(right: 4, top: 2),
-                          labelResolver: (_) => 'your avg',
-                          style: const TextStyle(
-                              color: Colors.green, fontSize: 9),
-                        ),
-                      ),
-                  ]),
                   titlesData: FlTitlesData(
-                    rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
-                    topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 36,
                         interval: maxY / 4,
                         getTitlesWidget: (v, _) => Text(
-                          isInt ? v.toInt().toString()
-                                : v.toStringAsFixed(1),
-                          style: const TextStyle(
-                              color: Colors.white38, fontSize: 9)),
+                          isInt ? v.toInt().toString() : v.toStringAsFixed(1),
+                          style: TextStyle(color: mutedTextColor, fontSize: 10)),
                       ),
                     ),
                     bottomTitles: AxisTitles(
@@ -493,18 +427,12 @@ class _ContinuousMonitoringScreenState
                         reservedSize: 26,
                         getTitlesWidget: (v, _) {
                           final i = v.toInt();
-                          if (i < 0 || i >= _history.length)
-                            return const SizedBox.shrink();
-                          // Skip alternate labels to avoid overlap
-                          if (i % showEvery != 0 && i != 0)
-                            return const SizedBox.shrink();
+                          if (i < 0 || i >= _history.length) return const SizedBox.shrink();
+                          if (i % showEvery != 0 && i != 0) return const SizedBox.shrink();
                           final d = _history[i];
                           return Padding(
                             padding: const EdgeInsets.only(top: 6),
-                            child: Text(
-                              d.daysAgo == 0 ? 'Today' : d.dateLabel,
-                              style: const TextStyle(
-                                  color: Colors.white38, fontSize: 9)),
+                            child: Text(d.daysAgo == 0 ? 'Today' : d.dateLabel, style: TextStyle(color: mutedTextColor, fontSize: 10)),
                           );
                         },
                       ),
@@ -515,17 +443,11 @@ class _ContinuousMonitoringScreenState
                       spots: spots,
                       isCurved: true,
                       curveSmoothness: 0.3,
-                      color: color,
+                      color: chartColor,
                       barWidth: 2.5,
                       isStrokeCapRound: true,
-                      dotData: FlDotData(
-                        show: true,
-                        getDotPainter: (s, _, __, ___) => FlDotCirclePainter(
-                          radius: 3.5, color: color,
-                          strokeWidth: 1.5, strokeColor: Colors.white24),
-                      ),
-                      belowBarData: BarAreaData(
-                          show: true, color: color.withOpacity(0.10)),
+                      dotData: const FlDotData(show: true),
+                      belowBarData: BarAreaData(show: true, color: chartColor.withValues(alpha: 0.08)),
                     ),
                   ],
                 )),
@@ -536,42 +458,39 @@ class _ContinuousMonitoringScreenState
 
   Widget _baselineCard() {
     if (_baseline == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final isDark = ThemeController.instance.isDarkMode;
+    final primaryTextColor = isDark ? AppColors.darkTextPrimary : AppColors.lightPrimaryNavy;
+    final mutedTextColor = isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted;
+
     final b         = _baseline!;
     final avgScreen = _serverBaseline?['avg_screen_time'] ?? b.avgScreenTime;
     final avgSocial = _serverBaseline?['avg_social_ratio'] ?? b.avgSocialRatio;
     final avgWork   = _serverBaseline?['avg_work_ratio']   ?? b.avgWorkRatio;
-    final avgSwitch = _serverBaseline?['avg_app_switches']
-        ?? b.avgAppSwitchesPerHour.toDouble();
+    final avgSwitch = _serverBaseline?['avg_app_switches'] ?? b.avgAppSwitchesPerHour.toDouble();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A2E),
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF8A5CE6).withOpacity(0.4)),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          const Icon(Icons.person_outline, color: Color(0xFF8A5CE6), size: 18),
+          Icon(Icons.person_outline, color: primaryTextColor, size: 18),
           const SizedBox(width: 8),
-          const Expanded(
-            child: Text('Your Personal Baseline  (7 days)',
-                style: TextStyle(color: Color(0xFF8A5CE6),
-                    fontWeight: FontWeight.w700, fontSize: 13)),
+          Expanded(
+            child: Text('Your Personal Baseline  (7 days)', style: TextStyle(color: primaryTextColor, fontWeight: FontWeight.w700, fontSize: 14)),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: b.daysOfData >= 5
-                  ? Colors.green.withOpacity(0.2)
-                  : Colors.orange.withOpacity(0.2),
+              color: b.daysOfData >= 5 ? AppColors.riskLow.withValues(alpha: 0.12) : AppColors.riskModerate.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text(b.qualityLabel,
-                style: TextStyle(
-                    color: b.daysOfData >= 5 ? Colors.green : Colors.orange,
-                    fontSize: 10)),
+            child: Text(b.qualityLabel, style: TextStyle(color: b.daysOfData >= 5 ? AppColors.riskLow : AppColors.riskModerate, fontSize: 11, fontWeight: FontWeight.w600)),
           ),
         ]),
         const SizedBox(height: 10),
@@ -579,12 +498,11 @@ class _ContinuousMonitoringScreenState
         _bRow('Avg social usage', '${(avgSocial * 100).toStringAsFixed(0)}%'),
         _bRow('Avg work usage',   '${(avgWork * 100).toStringAsFixed(0)}%'),
         _bRow('Avg app switches', '${avgSwitch.toStringAsFixed(0)} /hr'),
-        const Divider(color: Colors.white12, height: 16),
-        const Row(children: [
-          Icon(Icons.tune, color: Colors.white38, size: 14),
-          SizedBox(width: 6),
-          Text('Dynamic Thresholds  (personalised)',
-              style: TextStyle(color: Colors.white38, fontSize: 11)),
+        Divider(color: theme.dividerColor, height: 16),
+        Row(children: [
+          Icon(Icons.tune, color: mutedTextColor, size: 14),
+          const SizedBox(width: 6),
+          Text('Dynamic Thresholds  (personalised)', style: TextStyle(color: mutedTextColor, fontSize: 12)),
         ]),
         const SizedBox(height: 6),
         _bRow('Screen time',  '${b.thresholdScreenTime.toStringAsFixed(1)} h'),
@@ -594,20 +512,28 @@ class _ContinuousMonitoringScreenState
     );
   }
 
-  Widget _bRow(String l, String v) => Padding(
-        padding: const EdgeInsets.only(bottom: 5),
-        child: Row(children: [
-          Expanded(child: Text(l,
-              style: const TextStyle(color: Colors.white60, fontSize: 13))),
-          Text(v, style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
-        ]),
-      );
+  Widget _bRow(String l, String v) {
+    final isDark = ThemeController.instance.isDarkMode;
+    final primaryTextColor = isDark ? AppColors.darkTextPrimary : AppColors.lightPrimaryNavy;
+    final secondaryTextColor = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
-  // ── Build ─────────────────────────────────────────────────────────────────
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Row(children: [
+        Expanded(child: Text(l, style: TextStyle(color: secondaryTextColor, fontSize: 13))),
+        Text(v, style: TextStyle(color: primaryTextColor, fontWeight: FontWeight.w600, fontSize: 13)),
+      ]),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = ThemeController.instance.isDarkMode;
+    final primaryTextColor = isDark ? AppColors.darkTextPrimary : AppColors.lightPrimaryNavy;
+    final secondaryTextColor = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    final mutedTextColor = isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted;
+
     final today         = _history.isNotEmpty ? _history.first : null;
     final b             = _baseline;
     final alerts        = _alerts;
@@ -622,24 +548,26 @@ class _ContinuousMonitoringScreenState
         .map((e) => FlSpot(e.key.toDouble(), e.value.socialAppRatio)).toList();
 
     final switchSpots = _history.asMap().entries
-        .map((e) => FlSpot(e.key.toDouble(),
-            e.value.appSwitchesPerHour.toDouble())).toList();
+        .map((e) => FlSpot(e.key.toDouble(), e.value.appSwitchesPerHour.toDouble())).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0F),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0B0B0F),
-        title: const Text('Continuous Monitoring',
-            style: TextStyle(color: Colors.white)),
-        iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
+      appBar: VeerMitraAppBar(
+        extraActions: [
           IconButton(
             tooltip: 'Refresh',
             icon: _isFetching
-                ? const SizedBox(width: 18, height: 18,
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
                     child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2))
-                : const Icon(Icons.refresh, color: Colors.white),
+                      color: theme.appBarTheme.foregroundColor,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : Icon(
+                    Icons.refresh,
+                    color: theme.appBarTheme.foregroundColor,
+                  ),
             onPressed: _isFetching ? null : _loadAll,
           ),
         ],
@@ -649,20 +577,18 @@ class _ContinuousMonitoringScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
-            // Status bar
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               margin: const EdgeInsets.only(bottom: 14),
               decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1C),
+                color: isDark ? AppColors.darkSurfaceMuted : AppColors.lightSurfaceMuted,
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: theme.dividerColor),
               ),
               child: Row(children: [
-                const Icon(Icons.access_time, color: Colors.white38, size: 14),
+                Icon(Icons.access_time, color: mutedTextColor, size: 14),
                 const SizedBox(width: 8),
-                Expanded(child: Text(_statusMsg,
-                    style: const TextStyle(color: Colors.white54, fontSize: 12))),
+                Expanded(child: Text(_statusMsg, style: TextStyle(color: secondaryTextColor, fontSize: 12))),
               ]),
             ),
 
@@ -671,14 +597,10 @@ class _ContinuousMonitoringScreenState
 
             _card(
               title: 'Screen Time Today  (live)',
-              value: screenDisplay != null
-                  ? '${screenDisplay.toStringAsFixed(1)} h' : '--',
+              value: screenDisplay != null ? '${screenDisplay.toStringAsFixed(1)} h' : '--',
               icon: Icons.phone_android_outlined,
-              valueColor: screenAbove ? Colors.orange : null,
-              subtitle: b != null
-                  ? 'avg: ${b.avgScreenTime.toStringAsFixed(1)}h  '
-                    '· threshold: ${b.thresholdScreenTime.toStringAsFixed(1)}h'
-                  : null,
+              valueColor: screenAbove ? AppColors.saffronAccent : null,
+              subtitle: b != null ? 'avg: ${b.avgScreenTime.toStringAsFixed(1)}h  · threshold: ${b.thresholdScreenTime.toStringAsFixed(1)}h' : null,
               highlight: screenAbove,
             ),
 
@@ -686,38 +608,24 @@ class _ContinuousMonitoringScreenState
               title: 'App Switches / hr',
               value: today != null ? '${today.appSwitchesPerHour}' : '--',
               icon: Icons.swap_horiz_outlined,
-              subtitle: b != null
-                  ? 'avg: ${b.avgAppSwitchesPerHour}/hr  '
-                    '· threshold: ${b.thresholdAppSwitches}/hr'
-                  : null,
-              valueColor: (today != null && b != null &&
-                      today.appSwitchesPerHour > b.thresholdAppSwitches)
-                  ? Colors.orange : null,
-              highlight: today != null && b != null &&
-                  today.appSwitchesPerHour > b.thresholdAppSwitches,
+              subtitle: b != null ? 'avg: ${b.avgAppSwitchesPerHour}/hr  · threshold: ${b.thresholdAppSwitches}/hr' : null,
+              valueColor: (today != null && b != null && today.appSwitchesPerHour > b.thresholdAppSwitches) ? AppColors.saffronAccent : null,
+              highlight: today != null && b != null && today.appSwitchesPerHour > b.thresholdAppSwitches,
             ),
 
             _card(
               title: 'Social App Usage',
-              value: today != null
-                  ? '${(today.socialAppRatio * 100).toStringAsFixed(0)}%' : '--',
+              value: today != null ? '${(today.socialAppRatio * 100).toStringAsFixed(0)}%' : '--',
               icon: Icons.people_outline,
-              subtitle: b != null
-                  ? 'avg: ${(b.avgSocialRatio * 100).toStringAsFixed(0)}%  '
-                    '· threshold: ${(b.thresholdSocialRatio * 100).toStringAsFixed(0)}%'
-                  : null,
-              valueColor: (today != null && b != null &&
-                      today.socialAppRatio > b.thresholdSocialRatio)
-                  ? Colors.orange : null,
+              subtitle: b != null ? 'avg: ${(b.avgSocialRatio * 100).toStringAsFixed(0)}%  · threshold: ${(b.thresholdSocialRatio * 100).toStringAsFixed(0)}%' : null,
+              valueColor: (today != null && b != null && today.socialAppRatio > b.thresholdSocialRatio) ? AppColors.saffronAccent : null,
             ),
 
             _card(
               title: 'Work App Usage',
-              value: today != null
-                  ? '${(today.workAppRatio * 100).toStringAsFixed(0)}%' : '--',
+              value: today != null ? '${(today.workAppRatio * 100).toStringAsFixed(0)}%' : '--',
               icon: Icons.work_outline,
-              subtitle: b != null
-                  ? 'avg: ${(b.avgWorkRatio * 100).toStringAsFixed(0)}%' : null,
+              subtitle: b != null ? 'avg: ${(b.avgWorkRatio * 100).toStringAsFixed(0)}%' : null,
             ),
 
             const SizedBox(height: 6),
@@ -727,26 +635,22 @@ class _ContinuousMonitoringScreenState
                 margin: const EdgeInsets.only(bottom: 14),
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2A1A0A),
+                  color: AppColors.saffronAccent.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.orange.withOpacity(0.4)),
+                  border: Border.all(color: AppColors.saffronAccent.withValues(alpha: 0.3)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Row(children: [
-                      Icon(Icons.warning_amber_outlined,
-                          color: Colors.orange, size: 18),
+                      Icon(Icons.warning_amber_outlined, color: AppColors.saffronAccent, size: 18),
                       SizedBox(width: 8),
-                      Text('Deviation from Your 7-Day Normal',
-                          style: TextStyle(
-                              color: Colors.orange, fontWeight: FontWeight.w700)),
+                      Text('Deviation from Your 7-Day Normal', style: TextStyle(color: AppColors.saffronAccent, fontWeight: FontWeight.w700)),
                     ]),
                     const SizedBox(height: 10),
                     ...alerts.map((a) => Padding(
                           padding: const EdgeInsets.only(bottom: 5),
-                          child: Text(a, style: const TextStyle(
-                              color: Colors.white70, fontSize: 13)),
+                          child: Text(a, style: TextStyle(color: primaryTextColor, fontSize: 13)),
                         )),
                   ],
                 ),
@@ -755,10 +659,8 @@ class _ContinuousMonitoringScreenState
             _chart(
               title: 'Screen Time  (hours)',
               spots: screenSpots,
-              maxY: screenSpots.isEmpty ? 16.0
-                  : (screenSpots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.4)
-                      .clamp(4.0, 24.0),
-              color: const Color(0xFF8A5CE6),
+              maxY: screenSpots.isEmpty ? 16.0 : (screenSpots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.4).clamp(4.0, 24.0),
+              color: primaryTextColor,
               threshY: b?.thresholdScreenTime,
               avgY:    b?.avgScreenTime,
             ),
@@ -766,11 +668,9 @@ class _ContinuousMonitoringScreenState
             _chart(
               title: 'App Switches / hr',
               spots: switchSpots,
-              maxY: switchSpots.isEmpty ? 80.0
-                  : (switchSpots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.4)
-                      .clamp(20.0, 120.0),
+              maxY: switchSpots.isEmpty ? 80.0 : (switchSpots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.4).clamp(20.0, 120.0),
               isInt: true,
-              color: Colors.tealAccent,
+              color: AppColors.saffronAccent,
               threshY: b?.thresholdAppSwitches.toDouble(),
               avgY:    b?.avgAppSwitchesPerHour.toDouble(),
             ),
@@ -778,10 +678,8 @@ class _ContinuousMonitoringScreenState
             _chart(
               title: 'Social App Usage',
               spots: socialSpots,
-              maxY: socialSpots.isEmpty ? 1.0
-                  : (socialSpots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.4)
-                      .clamp(0.5, 1.5),
-              color: Colors.pinkAccent,
+              maxY: socialSpots.isEmpty ? 1.0 : (socialSpots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.4).clamp(0.5, 1.5),
+              color: AppColors.greenAccent,
               threshY: b?.thresholdSocialRatio,
               avgY:    b?.avgSocialRatio,
             ),

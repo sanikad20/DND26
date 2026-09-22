@@ -222,7 +222,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
         decoration: BoxDecoration(
           color: const Color(0xFF1A1A2E),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF8A5CE6).withOpacity(0.3)),
+          border: Border.all(color: const Color(0xFF8A5CE6).withValues(alpha: 0.3)),
         ),
         child: Row(children: [
           const Icon(Icons.cloud_outlined, color: Color(0xFF8A5CE6), size: 16),

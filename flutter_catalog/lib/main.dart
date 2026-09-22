@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';   // ← ADD
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'welcome_screen.dart';
-import 'home_screen.dart';                            // ← ADD
-import 'config/api_config.dart';   // ← ADD
+import 'home_screen.dart';
+import 'config/api_config.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  await ApiConfig.instance.init();  // ← ADD: loads saved URL before any screen opens
- 
+  await ApiConfig.instance.init();
+  await ThemeController.instance.init();
+
   runApp(const BrainLagApp());
 }
 
@@ -21,11 +23,18 @@ class BrainLagApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'BrainLag',
-      theme: ThemeData(fontFamily: 'Roboto'),
-      home: const AuthGate(),   // ← CHANGED from WelcomeScreen
+    return ListenableBuilder(
+      listenable: ThemeController.instance,
+      builder: (context, child) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'Veer Mitra',
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: ThemeController.instance.themeMode,
+          home: const AuthGate(),
+        );
+      },
     );
   }
 }
@@ -43,7 +52,9 @@ class AuthGate extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
           );
         }
 

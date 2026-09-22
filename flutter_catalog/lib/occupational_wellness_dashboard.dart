@@ -5,6 +5,8 @@ import 'api_service.dart';
 import 'features/burnout/state/burnout_history_store.dart';
 import 'occupational_consent_screen.dart';
 import 'occupational_wellness_plan.dart';
+import 'theme/app_theme.dart';
+import 'widgets/veer_mitra_app_bar.dart';
 
 class OccupationalWellnessDashboard extends StatefulWidget {
   const OccupationalWellnessDashboard({super.key});
@@ -17,19 +19,12 @@ class OccupationalWellnessDashboard extends StatefulWidget {
 class _OccupationalWellnessDashboardState
     extends State<OccupationalWellnessDashboard> {
   OccupationalAssessmentResult? _latestAssessment;
-  // Only exists once we have an assessment from THIS session to scope it
-  // to (needs a plan_id - see OccupationalWellnessPlanScreen). A past
-  // assessment surfaced only via history has no full plan/recommendation
-  // detail attached (the history endpoint intentionally stays lightweight),
-  // so there's nothing to build progress tracking against until the
-  // backend grows a "fetch one assessment's full detail" endpoint.
   OccupationalPlanProgress? _planProgress;
 
   OccupationalHistory? _history;
   bool _historyLoading = true;
   String? _historyError;
 
-  // Digital Burnout scores saved on this device by Manual / Continuous mode.
   List<BurnoutHistoryPoint> _burnoutHistory = const [];
 
   @override
@@ -51,8 +46,6 @@ class _OccupationalWellnessDashboardState
     super.dispose();
   }
 
-  /// Attaches a fresh OccupationalPlanProgress scoped to this assessment's
-  /// plan_id, replacing (and unsubscribing from) any previous one.
   void _attachPlanProgress(OccupationalAssessmentResult assessment) {
     _planProgress?.removeListener(_refreshPlanState);
     final progress = OccupationalPlanProgress(planId: assessment.planId);
@@ -129,31 +122,21 @@ class _OccupationalWellnessDashboardState
   Color _riskColor(String? level) {
     switch (level) {
       case 'Low':
-        return const Color(0xFF3DDC97);
+        return AppColors.riskLow;
       case 'Moderate':
-        return const Color(0xFFFFB020);
+        return AppColors.riskModerate;
       case 'High':
-        return const Color(0xFFFF6B6B);
+        return AppColors.riskHigh;
       default:
-        return const Color(0xFF8A5CE6);
+        return AppColors.saffronAccent;
     }
   }
 
   String _formatDate(DateTime? date) {
     if (date == null) return 'No assessment yet';
     const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
     ];
     return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
@@ -190,12 +173,10 @@ class _OccupationalWellnessDashboardState
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
     final result = _latestAssessment;
-    // Fall back to the most recent history point for the summary card so a
-    // returning user (no in-session assessment yet) still sees their last
-    // score/risk instead of "Not assessed". History only carries the
-    // lightweight fields (score, risk_level, timestamp) - not the full
-    // recommendation/plan detail, so this fallback is display-only.
     final latestHistoryPoint = (_history?.assessments.isNotEmpty ?? false)
         ? _history!.assessments.last
         : null;
@@ -205,15 +186,8 @@ class _OccupationalWellnessDashboardState
     final riskColor = _riskColor(displayRiskLevel);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0F),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0B0B0F),
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text(
-          'Wellness Dashboard',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-        ),
+      appBar: const VeerMitraAppBar(
+        showProfileButton: true,
       ),
       body: SafeArea(
         child: Center(
@@ -224,11 +198,14 @@ class _OccupationalWellnessDashboardState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Your personal wellness overview',
-                    style: TextStyle(color: Colors.white60, fontSize: 15),
+                  Text(
+                    'Your personal force wellness overview',
+                    style: TextStyle(
+                      color: textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
+                      fontSize: 15,
+                    ),
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 20),
                   _DashboardPanel(
                     title: 'Trends at a glance',
                     child: _TrendsAtAGlance(
@@ -241,7 +218,7 @@ class _OccupationalWellnessDashboardState
                     builder: (context, constraints) {
                       final wide = constraints.maxWidth >= 860;
                       final summary = _DashboardPanel(
-                        title: 'Current assessment',
+                        title: 'Current Assessment',
                         child: _CurrentAssessmentCard(
                           riskLevel: displayRiskLevel ?? 'Not assessed',
                           score: displayScore,
@@ -251,7 +228,7 @@ class _OccupationalWellnessDashboardState
                         ),
                       );
                       final action = _DashboardPanel(
-                        title: 'Recommended action',
+                        title: 'Recommended Action',
                         child: _RecommendedActionCard(
                           text: _primaryRecommendation(),
                           color: riskColor,
@@ -282,7 +259,7 @@ class _OccupationalWellnessDashboardState
                     builder: (context, constraints) {
                       final wide = constraints.maxWidth >= 860;
                       final insights = _DashboardPanel(
-                        title: 'Quick insights',
+                        title: 'Quick Insights',
                         child: _InsightList(result: result),
                       );
                       final planTotal = buildOccupationalPlanDays(
@@ -290,14 +267,14 @@ class _OccupationalWellnessDashboardState
                       ).length;
                       final planProgress = _planProgress;
                       final plan = _DashboardPanel(
-                        title: planTotal < 7 ? 'Maintain plan' : '7-day plan',
+                        title: planTotal < 7 ? 'Maintain Plan' : '7-Day Plan',
                         child: result == null
                             ? _PlanSummary(
                                 total: planTotal,
                                 completed: 0,
                                 started: false,
                                 onContinue: _openAssessment,
-                                continueLabel: 'Take assessment',
+                                continueLabel: 'Take Assessment',
                               )
                             : _PlanSummary(
                                 total: planTotal,
@@ -327,7 +304,7 @@ class _OccupationalWellnessDashboardState
                   ),
                   const SizedBox(height: 16),
                   _DashboardPanel(
-                    title: 'Wellness history',
+                    title: 'Assessment History',
                     child: _HistoryChartsSection(
                       history: _history,
                       loading: _historyLoading,
@@ -353,21 +330,23 @@ class _DashboardPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF17181D),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white10),
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: theme.textTheme.titleMedium?.color,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
@@ -397,19 +376,21 @@ class _CurrentAssessmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Container(
-              width: 54,
-              height: 54,
+              width: 50,
+              height: 50,
               decoration: BoxDecoration(
-                color: riskColor.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(16),
+                color: riskColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(Icons.health_and_safety_outlined, color: riskColor),
+              child: Icon(Icons.health_and_safety_outlined, color: riskColor, size: 26),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -417,10 +398,10 @@ class _CurrentAssessmentCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    riskLevel,
+                    riskLevel.toUpperCase(),
                     style: TextStyle(
                       color: riskColor,
-                      fontSize: 24,
+                      fontSize: 22,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -428,34 +409,32 @@ class _CurrentAssessmentCard extends StatelessWidget {
                     score == null
                         ? 'Complete your first assessment'
                         : '$score / 100 wellness indicator',
-                    style: const TextStyle(color: Colors.white60),
+                    style: TextStyle(
+                      color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         Text(
           'Date of assessment: $generatedAt',
-          style: const TextStyle(color: Colors.white54, fontSize: 13),
+          style: TextStyle(
+            color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+            fontSize: 13,
+          ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
             onPressed: onStart,
-            icon: const Icon(Icons.assignment_outlined, color: Colors.white),
+            icon: const Icon(Icons.assignment_outlined),
             label: Text(
               score == null ? 'Start Assessment' : 'Take New Assessment',
-              style: const TextStyle(color: Colors.white),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF45199D),
-              padding: const EdgeInsets.symmetric(vertical: 15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
             ),
           ),
         ),
@@ -472,6 +451,8 @@ class _RecommendedActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -480,8 +461,8 @@ class _RecommendedActionCard extends StatelessWidget {
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(
-              color: Colors.white70,
+            style: TextStyle(
+              color: theme.textTheme.bodyLarge?.color,
               fontSize: 14,
               height: 1.45,
             ),
@@ -499,10 +480,15 @@ class _InsightList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     if (result == null) {
-      return const Text(
+      return Text(
         'No assessment is available yet. Your contributors and protective factors will appear here after the questionnaire.',
-        style: TextStyle(color: Colors.white54, height: 1.45),
+        style: TextStyle(
+          color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+          height: 1.45,
+        ),
       );
     }
 
@@ -553,10 +539,12 @@ class _InsightRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: const Color(0xFF8A5CE6), size: 20),
+        Icon(icon, color: theme.colorScheme.primary, size: 20),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
@@ -564,16 +552,19 @@ class _InsightRow extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: theme.textTheme.titleSmall?.color,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 2),
               Text(
                 value,
-                style: const TextStyle(color: Colors.white60, height: 1.35),
+                style: TextStyle(
+                  color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
+                  height: 1.35,
+                ),
               ),
             ],
           ),
@@ -600,27 +591,36 @@ class _PlanSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         LinearProgressIndicator(
           value: total == 0 ? 0 : completed / total,
-          minHeight: 8,
-          borderRadius: BorderRadius.circular(20),
-          backgroundColor: Colors.white10,
-          color: const Color(0xFF3DDC97),
+          minHeight: 6,
+          borderRadius: BorderRadius.circular(10),
+          backgroundColor: theme.dividerColor,
+          color: AppColors.riskLow,
         ),
         const SizedBox(height: 10),
         Text(
           '$completed / $total completed',
-          style: const TextStyle(color: Colors.white70),
+          style: TextStyle(
+            color: theme.textTheme.bodyMedium?.color,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         Text(
           started
               ? 'Continue the plan from your latest assessment.'
               : 'Start the plan after your assessment, then mark each day complete.',
-          style: const TextStyle(color: Colors.white54, height: 1.35),
+          style: TextStyle(
+            color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+            fontSize: 13,
+            height: 1.35,
+          ),
         ),
         const SizedBox(height: 16),
         SizedBox(
@@ -629,14 +629,6 @@ class _PlanSummary extends StatelessWidget {
             onPressed: onContinue,
             icon: const Icon(Icons.calendar_today_outlined),
             label: Text(continueLabel),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              side: const BorderSide(color: Colors.white24),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
           ),
         ),
       ],
@@ -660,20 +652,20 @@ class _HistoryChartsSection extends StatelessWidget {
   Color _trendColor(String trend) {
     switch (trend) {
       case 'Improving':
-        return const Color(0xFF3DDC97);
+        return AppColors.riskLow;
       case 'Worsening':
-        return const Color(0xFFFF6B6B);
+        return AppColors.riskHigh;
       case 'Stable':
-        return const Color(0xFFFFB020);
+        return AppColors.riskModerate;
       default:
-        return Colors.white38;
+        return AppColors.saffronAccent;
     }
   }
 
   IconData _trendIcon(String trend) {
     switch (trend) {
       case 'Improving':
-        return Icons.trending_down; // lower score = less risk = improving
+        return Icons.trending_down;
       case 'Worsening':
         return Icons.trending_up;
       case 'Stable':
@@ -698,16 +690,18 @@ class _HistoryChartsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     if (loading) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
         child: Center(
           child: SizedBox(
             width: 22,
             height: 22,
             child: CircularProgressIndicator(
-              strokeWidth: 2.4,
-              color: Color(0xFF8A5CE6),
+              strokeWidth: 2,
+              color: theme.colorScheme.primary,
             ),
           ),
         ),
@@ -719,19 +713,22 @@ class _HistoryChartsSection extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFF111217),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white10),
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: theme.dividerColor),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.error_outline, color: Colors.white38, size: 18),
+            Icon(Icons.error_outline, color: theme.colorScheme.error, size: 18),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 error!,
-                style: const TextStyle(color: Colors.white60, height: 1.4),
+                style: TextStyle(
+                  color: theme.textTheme.bodyMedium?.color,
+                  height: 1.4,
+                ),
               ),
             ),
           ],
@@ -745,21 +742,24 @@ class _HistoryChartsSection extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF111217),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white10),
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: theme.dividerColor),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.timeline_outlined, color: Colors.white38),
+            Icon(Icons.timeline_outlined, color: theme.colorScheme.primary),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 hasLatest
-                    ? 'Complete one more assessment to start seeing a trend here. Each assessment is now saved to your account.'
+                    ? 'Complete one more assessment to start seeing a trend here. Each assessment is saved to your account.'
                     : 'No assessment history yet. Complete an assessment to start building your trend.',
-                style: const TextStyle(color: Colors.white60, height: 1.4),
+                style: TextStyle(
+                  color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
+                  height: 1.4,
+                ),
               ),
             ),
           ],
@@ -796,20 +796,18 @@ class _HistoryChartsSection extends StatelessWidget {
             const Spacer(),
             Text(
               '${points.length} assessments',
-              style: const TextStyle(color: Colors.white38, fontSize: 12),
+              style: TextStyle(
+                color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                fontSize: 12,
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 4),
-        const Text(
-          'Trend compares your average this week with last week.',
-          style: TextStyle(color: Colors.white38, fontSize: 12),
-        ),
         const SizedBox(height: 14),
-        const Text(
+        Text(
           'Score over time (0-100)',
           style: TextStyle(
-            color: Colors.white70,
+            color: theme.textTheme.titleSmall?.color,
             fontSize: 13,
             fontWeight: FontWeight.w700,
           ),
@@ -828,19 +826,13 @@ class _HistoryChartsSection extends StatelessWidget {
                 drawVerticalLine: false,
                 horizontalInterval: 25,
                 getDrawingHorizontalLine: (_) =>
-                    FlLine(color: Colors.white10, strokeWidth: 1),
+                    FlLine(color: theme.dividerColor, strokeWidth: 1),
               ),
               borderData: FlBorderData(show: false),
               titlesData: const FlTitlesData(
-                topTitles: AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                rightTitles: AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
+                topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 leftTitles: AxisTitles(
                   sideTitles: SideTitles(showTitles: true, reservedSize: 30),
                 ),
@@ -849,12 +841,12 @@ class _HistoryChartsSection extends StatelessWidget {
                 LineChartBarData(
                   spots: scoreSpots,
                   isCurved: true,
-                  color: const Color(0xFF8A5CE6),
+                  color: theme.colorScheme.primary,
                   barWidth: 3,
                   dotData: const FlDotData(show: true),
                   belowBarData: BarAreaData(
                     show: true,
-                    color: const Color(0xFF8A5CE6).withValues(alpha: 0.12),
+                    color: theme.colorScheme.primary.withValues(alpha: 0.08),
                   ),
                 ),
               ],
@@ -862,10 +854,10 @@ class _HistoryChartsSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        const Text(
+        Text(
           'Risk level over time',
           style: TextStyle(
-            color: Colors.white70,
+            color: theme.textTheme.titleSmall?.color,
             fontSize: 13,
             fontWeight: FontWeight.w700,
           ),
@@ -884,19 +876,13 @@ class _HistoryChartsSection extends StatelessWidget {
                 drawVerticalLine: false,
                 horizontalInterval: 1,
                 getDrawingHorizontalLine: (_) =>
-                    FlLine(color: Colors.white10, strokeWidth: 1),
+                    FlLine(color: theme.dividerColor, strokeWidth: 1),
               ),
               borderData: FlBorderData(show: false),
               titlesData: FlTitlesData(
-                topTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                rightTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                bottomTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 leftTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
@@ -904,10 +890,6 @@ class _HistoryChartsSection extends StatelessWidget {
                     interval: 1,
                     getTitlesWidget: (value, meta) {
                       const labels = {1: 'Low', 2: 'Moderate', 3: 'High'};
-                      // fl_chart can call this at extra tick positions near
-                      // the axis edges (e.g. 0.5, 3.5) depending on chart
-                      // width — only render at the exact integer values we
-                      // actually mean, everything else stays blank.
                       final rounded = value.round();
                       if ((value - rounded).abs() > 0.01) {
                         return const SizedBox.shrink();
@@ -916,8 +898,8 @@ class _HistoryChartsSection extends StatelessWidget {
                       if (label == null) return const SizedBox.shrink();
                       return Text(
                         label,
-                        style: const TextStyle(
-                          color: Colors.white54,
+                        style: TextStyle(
+                          color: theme.textTheme.bodySmall?.color,
                           fontSize: 11,
                         ),
                       );
@@ -942,8 +924,6 @@ class _HistoryChartsSection extends StatelessWidget {
   }
 }
 
-/// Digital Burnout and Occupational Stress trends side by side. Each keeps its
-/// own scale and colour and they are never merged into one number.
 class _TrendsAtAGlance extends StatelessWidget {
   final List<BurnoutHistoryPoint> burnout;
   final OccupationalHistory? occupational;
@@ -952,6 +932,7 @@ class _TrendsAtAGlance extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final burnoutValues = burnout.map((p) => p.score).toList();
     final occupationalValues =
         (occupational?.assessments ?? const <OccupationalHistoryPoint>[])
@@ -968,7 +949,7 @@ class _TrendsAtAGlance extends StatelessWidget {
               child: _MiniTrendCard(
                 title: 'Digital burnout',
                 scale: 'Score 1-10',
-                color: const Color(0xFF8A5CE6),
+                color: theme.colorScheme.primary,
                 values: burnoutValues,
                 minY: 0,
                 maxY: 10,
@@ -980,9 +961,9 @@ class _TrendsAtAGlance extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _MiniTrendCard(
-                title: 'Occupational stress',
+                title: 'Force wellness',
                 scale: 'Score 0-100',
-                color: const Color(0xFFFFB020),
+                color: AppColors.saffronAccent,
                 values: occupationalValues,
                 minY: 0,
                 maxY: 100,
@@ -994,10 +975,13 @@ class _TrendsAtAGlance extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        const Text(
-          'Shown separately on purpose: the two scores measure different '
-          'things using different methods, so they are never combined.',
-          style: TextStyle(color: Colors.white38, fontSize: 12, height: 1.4),
+        Text(
+          'Shown separately on purpose: the two scores measure different indicators using distinct evaluation models.',
+          style: TextStyle(
+            color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+            fontSize: 12,
+            height: 1.4,
+          ),
         ),
       ],
     );
@@ -1025,6 +1009,7 @@ class _MiniTrendCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final spots = [
       for (var i = 0; i < values.length; i++) FlSpot(i.toDouble(), values[i]),
     ];
@@ -1032,9 +1017,11 @@ class _MiniTrendCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF111217),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white10),
+        color: theme.cardColor == AppColors.lightSurfaceCard
+            ? AppColors.lightSurfaceMuted
+            : AppColors.darkSurfaceMuted,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1047,22 +1034,25 @@ class _MiniTrendCard extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             latestText,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
+            style: TextStyle(
+              color: theme.textTheme.titleLarge?.color,
+              fontSize: 22,
               fontWeight: FontWeight.w800,
             ),
           ),
           Text(
             scale,
-            style: const TextStyle(color: Colors.white38, fontSize: 11),
+            style: TextStyle(
+              color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+              fontSize: 11,
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           SizedBox(
-            height: 80,
+            height: 70,
             child: values.length >= 2
                 ? LineChart(
                     LineChartData(
@@ -1070,10 +1060,10 @@ class _MiniTrendCard extends StatelessWidget {
                       maxY: maxY,
                       minX: 0,
                       maxX: (values.length - 1).toDouble(),
-                      gridData: FlGridData(show: false),
+                      gridData: const FlGridData(show: false),
                       borderData: FlBorderData(show: false),
                       titlesData: const FlTitlesData(show: false),
-                      lineTouchData: LineTouchData(enabled: false),
+                      lineTouchData: const LineTouchData(enabled: false),
                       lineBarsData: [
                         LineChartBarData(
                           spots: spots,
@@ -1083,24 +1073,30 @@ class _MiniTrendCard extends StatelessWidget {
                           dotData: FlDotData(show: values.length <= 8),
                           belowBarData: BarAreaData(
                             show: true,
-                            color: color.withValues(alpha: 0.12),
+                            color: color.withValues(alpha: 0.1),
                           ),
                         ),
                       ],
                     ),
                   )
-                : const Center(
+                : Center(
                     child: Text(
                       'Not enough data yet',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white38, fontSize: 12),
+                      style: TextStyle(
+                        color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                        fontSize: 11,
+                      ),
                     ),
                   ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             '${values.length} ${values.length == 1 ? 'result' : 'results'}',
-            style: const TextStyle(color: Colors.white38, fontSize: 11),
+            style: TextStyle(
+              color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+              fontSize: 11,
+            ),
           ),
         ],
       ),

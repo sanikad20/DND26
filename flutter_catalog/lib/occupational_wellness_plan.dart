@@ -4,6 +4,8 @@ import 'features/occupational/models/occupational_assessment_result.dart';
 import 'features/occupational/services/occupational_plan_builder.dart';
 import 'features/occupational/state/occupational_plan_progress.dart';
 import 'features/occupational/widgets/occupational_plan_day_card.dart';
+import 'theme/app_theme.dart';
+import 'widgets/veer_mitra_app_bar.dart';
 
 export 'features/occupational/models/occupational_plan_day.dart';
 export 'features/occupational/services/occupational_plan_builder.dart';
@@ -23,8 +25,6 @@ class OccupationalWellnessPlanScreen extends StatefulWidget {
 
 class _OccupationalWellnessPlanScreenState
     extends State<OccupationalWellnessPlanScreen> {
-  // Null when this screen was opened without an assessment (nothing to
-  // scope progress to yet - there's no plan_id without one).
   OccupationalPlanProgress? _progress;
 
   @override
@@ -54,25 +54,12 @@ class _OccupationalWellnessPlanScreenState
     final progress = _progress;
     final days = buildOccupationalPlanDays(widget.assessment);
     final totalDays = days.length;
-    // Low risk gets a short "maintain" list instead of a full 7-day plan.
     final isMaintain = totalDays < 7;
     final nextDay = progress?.nextOpenDay(totalDays) ?? 1;
     final riskLevel = widget.assessment?.riskLevel ?? 'Assessment pending';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0F),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0B0B0F),
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: Text(
-          isMaintain ? 'Maintain Plan' : '7-Day Wellness Plan',
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
+      appBar: const VeerMitraAppBar(),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -136,24 +123,23 @@ class _OccupationalWellnessPlanScreenState
   }
 }
 
-/// Shown if this screen is opened without an assessment to attach a plan
-/// to - there's no plan_id to load or save progress against.
 class _NoPlanNotice extends StatelessWidget {
   const _NoPlanNotice();
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF17181D),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white10),
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.dividerColor),
       ),
-      child: const Text(
+      child: Text(
         'Take an assessment first to get a wellness plan.',
-        style: TextStyle(color: Colors.white70),
+        style: TextStyle(color: ThemeController.instance.isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
       ),
     );
   }
@@ -185,13 +171,18 @@ class _PlanHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final allDone = completed >= totalDays;
+    final theme = Theme.of(context);
+    final isDark = ThemeController.instance.isDarkMode;
+    final primaryTextColor = isDark ? AppColors.darkTextPrimary : AppColors.lightPrimaryNavy;
+    final secondaryTextColor = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF17181D),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white10),
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -200,15 +191,15 @@ class _PlanHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF3DDC97).withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(14),
+                  color: AppColors.greenAccent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
                   Icons.calendar_month_outlined,
-                  color: Color(0xFF3DDC97),
+                  color: AppColors.greenAccent,
                 ),
               ),
               const SizedBox(width: 14),
@@ -218,19 +209,19 @@ class _PlanHeader extends StatelessWidget {
                   children: [
                     Text(
                       isMaintain
-                          ? 'Keep-it-steady plan'
-                          : 'Interactive 7-day wellness plan',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 23,
+                          ? 'Keep-It-Steady Plan'
+                          : 'Interactive 7-Day Wellness Plan',
+                      style: TextStyle(
+                        color: primaryTextColor,
+                        fontSize: 20,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       'Current risk context: $riskLevel. Progress is saved to your account.',
-                      style: const TextStyle(
-                        color: Colors.white60,
+                      style: TextStyle(
+                        color: secondaryTextColor,
                         height: 1.35,
                       ),
                     ),
@@ -242,16 +233,16 @@ class _PlanHeader extends StatelessWidget {
           const SizedBox(height: 18),
           LinearProgressIndicator(
             value: completed / totalDays,
-            minHeight: 8,
-            borderRadius: BorderRadius.circular(20),
-            backgroundColor: Colors.white10,
-            color: const Color(0xFF3DDC97),
+            minHeight: 6,
+            borderRadius: BorderRadius.circular(10),
+            backgroundColor: theme.dividerColor,
+            color: AppColors.greenAccent,
           ),
           const SizedBox(height: 10),
           Text(
             '$completed / $totalDays days completed',
-            style: const TextStyle(
-              color: Colors.white70,
+            style: TextStyle(
+              color: primaryTextColor,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -262,20 +253,17 @@ class _PlanHeader extends StatelessWidget {
             children: [
               ElevatedButton.icon(
                 onPressed: started ? null : onStart,
-                icon: const Icon(Icons.play_arrow_rounded, color: Colors.white),
+                icon: const Icon(Icons.play_arrow_rounded),
                 label: Text(
                   started ? 'Plan Started' : 'Start Plan',
-                  style: const TextStyle(color: Colors.white),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF45199D),
-                  disabledBackgroundColor: const Color(0xFF2A2440),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 18,
                     vertical: 14,
                   ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
               ),
@@ -286,15 +274,12 @@ class _PlanHeader extends StatelessWidget {
                   allDone ? 'All Days Complete' : 'Complete Day $nextDay',
                 ),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  disabledForegroundColor: Colors.white30,
-                  side: const BorderSide(color: Colors.white24),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 18,
                     vertical: 14,
                   ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
               ),
@@ -303,8 +288,7 @@ class _PlanHeader extends StatelessWidget {
                 icon: const Icon(Icons.restart_alt),
                 label: const Text('Reset Plan'),
                 style: TextButton.styleFrom(
-                  foregroundColor: Colors.white70,
-                  disabledForegroundColor: Colors.white24,
+                  foregroundColor: secondaryTextColor,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 14,

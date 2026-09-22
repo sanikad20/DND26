@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
+import 'theme/app_theme.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -8,265 +9,134 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final theme = Theme.of(context);
+    final isDark = ThemeController.instance.isDarkMode;
+    final primaryTextColor = isDark ? AppColors.darkTextPrimary : AppColors.lightPrimaryNavy;
+    final secondaryTextColor = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F3F3),
-      body: Stack(
-        clipBehavior: Clip.none, // Allows the wave to extend outside the screen
-        children: [
-          /// ---------------- Main Content ----------------
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-              child: Column(
-                children: [
-                  const SizedBox(height: 20),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Spacer(),
 
-                  /// Main Rounded Card
-                  Expanded(
-                    child: Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8F8F8),
-                        borderRadius: BorderRadius.circular(50),
+              /// Card Container for Logo & Welcome Header
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: theme.dividerColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    /// Veer Mitra Logo
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.asset(
+                        'assets/logo.png',
+                        width: screenWidth * 0.45,
+                        height: screenWidth * 0.45,
+                        fit: BoxFit.contain,
                       ),
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 60),
+                    ),
+                    const SizedBox(height: 24),
 
-                          /// ---------------- Logo Section ----------------
-                          Expanded(
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                /// Left Decorative Panel
-                                Positioned(
-                                  left: 30,
-                                  child: Container(
-                                    width: 80,
-                                    height: 180,
-                                    color: const Color(0xFFEFF2F5),
-                                  ),
-                                ),
+                    /// App Title
+                    Text(
+                      'VEER MITRA',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                        color: primaryTextColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
 
-                                /// Right Decorative Panel
-                                Positioned(
-                                  right: 30,
-                                  child: Container(
-                                    width: 80,
-                                    height: 180,
-                                    color: const Color(0xFFEFF2F5),
-                                  ),
-                                ),
+                    /// Subtitle
+                    Text(
+                      'Wellness support for those who serve',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: secondaryTextColor,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
-                                /// Large Logo (No Container)
-                                Image.asset(
-                                  'assets/logo.png',
-                                  width: screenWidth * 0.85,
-                                  fit: BoxFit.contain,
-                                ),
-                              ],
-                            ),
+              const Spacer(),
+
+              /// Buttons Section
+              Column(
+                children: [
+                  /// Login Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const LoginScreen(),
                           ),
+                        );
+                      },
+                      child: const Text(
+                        'Login',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
 
-                          /// ---------------- Tagline ----------------
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 24),
-                            child: Text(
-                              'Reset Your Focus, Reclaim Your Balance.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.black87,
-                              ),
-                            ),
+                  /// Register Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const RegisterScreen(),
                           ),
-
-                          const SizedBox(height: 30),
-
-                          /// ---------------- Buttons ----------------
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 24),
-                            child: Column(
-                              children: [
-                                /// Login Button
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF5C21CC),
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 16),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(14),
-                                      ),
-                                      elevation: 4,
-                                    ),
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              const LoginScreen(),
-                                        ),
-                                      );
-                                    },
-                                    child: const Text(
-                                      'Login',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-
-                                /// Register Button
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: OutlinedButton(
-                                    style: OutlinedButton.styleFrom(
-                                      side: const BorderSide(
-                                        color: Color(0xFF5C21CC),
-                                        width: 1.5,
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 16),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(14),
-                                      ),
-                                    ),
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              const RegisterScreen(),
-                                        ),
-                                      );
-                                    },
-                                    child: const Text(
-                                      'Register',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Color(0xFF5C21CC),
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 120), // Space for wave
-                              ],
-                            ),
-                          ),
-                        ],
+                        );
+                      },
+                      child: const Text(
+                        'Register',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 16),
+            ],
           ),
-
-          /// ---------------- Bottom Waves ----------------
-          Positioned(
-            bottom: -10,
-            left: -40,
-            right: -40,
-            child: SizedBox(
-              width: screenWidth + 80, // Extend beyond screen edges
-              height: 180,
-              child: Stack(
-                children: const [
-                  CustomPaint(
-                    size: Size(double.infinity, 180),
-                    painter: LightWavePainter(),
-                  ),
-                  CustomPaint(
-                    size: Size(double.infinity, 180),
-                    painter: DarkWavePainter(),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
-}
-
-/// ---------------- Light Purple Wave ----------------
-class LightWavePainter extends CustomPainter {
-  const LightWavePainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF8A5CE6)
-      ..style = PaintingStyle.fill;
-
-    final path = Path()
-      ..moveTo(0, size.height * 0.4)
-      ..quadraticBezierTo(
-        size.width * 0.25,
-        size.height * 0.15,
-        size.width * 0.5,
-        size.height * 0.4,
-      )
-      ..quadraticBezierTo(
-        size.width * 0.75,
-        size.height * 0.6,
-        size.width,
-        size.height * 0.4,
-      )
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
-}
-
-/// ---------------- Dark Purple Wave ----------------
-class DarkWavePainter extends CustomPainter {
-  const DarkWavePainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF5C21CC)
-      ..style = PaintingStyle.fill;
-
-    final path = Path()
-      ..moveTo(0, size.height * 0.6)
-      ..quadraticBezierTo(
-        size.width * 0.3,
-        size.height * 0.85,
-        size.width * 0.6,
-        size.height * 0.6,
-      )
-      ..quadraticBezierTo(
-        size.width * 0.9,
-        size.height * 0.4,
-        size.width,
-        size.height * 0.7,
-      )
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }
