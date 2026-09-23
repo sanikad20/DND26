@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'api_service.dart';
+import 'core/network/api_client.dart';
 import 'usage_service.dart';
 import 'features/burnout/state/burnout_history_store.dart';
 import 'theme/app_theme.dart';
@@ -152,6 +153,12 @@ class _ContinuousMonitoringScreenState
           debugPrint("========== LSTM FAILED ==========");
           debugPrint(e.toString());
           debugPrint(st.toString());
+          if (mounted) {
+            setState(() => _lstmLevel =
+                (e is ApiException && e.isNetworkError)
+                    ? 'Server unreachable'
+                    : 'Prediction failed');
+          }
         }
       } else {
         if (mounted) {

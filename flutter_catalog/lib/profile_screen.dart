@@ -1,10 +1,107 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
+import 'config/api_config.dart';
 import 'theme/app_theme.dart';
 import 'welcome_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
+
+  /// Lets the user point the app at the right backend (e.g. the laptop's
+  /// current LAN IP) and check it responds, without rebuilding the app.
+  Future<void> _editServerUrl(BuildContext context) async {
+    final controller = TextEditingController(text: ApiConfig.instance.baseUrl);
+    String? status;
+    bool reachable = false;
+    bool testing = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          Future<void> test() async {
+            final url = ApiConfig.normalize(controller.text);
+            setDialogState(() {
+              testing = true;
+              status = null;
+            });
+            try {
+              final r = await http
+                  .get(Uri.parse('$url/health'))
+                  .timeout(const Duration(seconds: 6));
+              reachable = r.statusCode == 200;
+              status = reachable
+                  ? 'Connected'
+                  : 'Server answered with HTTP ${r.statusCode}';
+            } catch (_) {
+              reachable = false;
+              status = 'Could not reach $url';
+            }
+            if (!context.mounted) return;
+            setDialogState(() => testing = false);
+          }
+
+          return AlertDialog(
+            title: const Text('Backend server'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.url,
+                  autocorrect: false,
+                  decoration: const InputDecoration(
+                    hintText: 'http://10.48.117.154:8000',
+                  ),
+                ),
+                if (status != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(
+                      status!,
+                      style: TextStyle(
+                        color: reachable
+                            ? AppColors.riskLow
+                            : AppColors.riskHigh,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                if (ApiConfig.hasBuildTimeOverride)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 12),
+                    child: Text(
+                      'This build was started with API_BASE_URL, which '
+                      'overrides the saved URL on every launch.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: testing ? null : test,
+                child: Text(testing ? 'Testing…' : 'Test'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  await ApiConfig.instance.setBaseUrl(controller.text);
+                  if (dialogContext.mounted) Navigator.pop(dialogContext);
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
   Future<void> _confirmLogout(BuildContext context) async {
     final theme = Theme.of(context);
@@ -273,6 +370,27 @@ class ProfileScreen extends StatelessWidget {
               ),
 
               const SizedBox(height: 32),
+
+              /// Backend server (change URL / test connection)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _editServerUrl(context),
+                  icon: const Icon(Icons.dns_rounded),
+                  label: const Text(
+                    'Backend server',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
 
               /// Logout Button
               SizedBox(
