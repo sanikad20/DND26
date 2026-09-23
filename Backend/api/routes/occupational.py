@@ -49,7 +49,13 @@ def assess(
 
 
 @router.get("/history", response_model=HistoryResponse)
-def get_history(current_uid: str = Depends(get_current_uid)):
+@router.get("/history/{firebase_uid}", response_model=HistoryResponse)
+def get_history(
+    firebase_uid: str | None = None,
+    current_uid: str = Depends(get_current_uid),
+):
+    if firebase_uid is not None and firebase_uid != current_uid:
+        raise HTTPException(status_code=403, detail="Forbidden")
     return get_occupational_service().get_history(current_uid)
 
 

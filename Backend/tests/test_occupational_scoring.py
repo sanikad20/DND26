@@ -268,6 +268,18 @@ def test_history_is_private_per_user(occ_client):
     assert body["assessments"] == []
 
 
+def test_history_endpoint_with_path_param_uid(occ_client):
+    uid = "history-user-path"
+    assess(occ_client, uid, **STRESSED)
+    r = occ_client.get(f"/occupational/history/{uid}", headers=auth_header(uid))
+    assert r.status_code == 200
+    assert len(r.json()["assessments"]) == 1
+
+    # Mismatched uid in path vs bearer token must be rejected with 403
+    r_forbidden = occ_client.get(f"/occupational/history/{uid}", headers=auth_header("other-user"))
+    assert r_forbidden.status_code == 403
+
+
 def test_assessment_requires_authorization_header(occ_client):
     r = occ_client.post("/occupational/assess", json=make_answers())
     assert r.status_code == 401

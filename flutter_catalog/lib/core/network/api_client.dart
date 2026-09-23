@@ -74,13 +74,17 @@ class ApiClient {
   Future<Map<String, dynamic>> postJson(
     String path,
     Map<String, dynamic> body, {
+    Map<String, String>? headers,
     Duration timeout = const Duration(seconds: 15),
   }) async {
-    final headers = await _headers(json: true);
+    final reqHeaders = await _headers(json: true);
+    if (headers != null) {
+      reqHeaders.addAll(headers);
+    }
     final response = await _send(
       () => _httpClient.post(
         Uri.parse('$_baseUrl$path'),
-        headers: headers,
+        headers: reqHeaders,
         body: jsonEncode(body),
       ),
       path,
@@ -98,11 +102,15 @@ class ApiClient {
 
   Future<Map<String, dynamic>> getJson(
     String path, {
+    Map<String, String>? headers,
     Duration timeout = const Duration(seconds: 15),
   }) async {
-    final headers = await _headers();
+    final reqHeaders = await _headers();
+    if (headers != null) {
+      reqHeaders.addAll(headers);
+    }
     final response = await _send(
-      () => _httpClient.get(Uri.parse('$_baseUrl$path'), headers: headers),
+      () => _httpClient.get(Uri.parse('$_baseUrl$path'), headers: reqHeaders),
       path,
       timeout,
     );

@@ -1,3 +1,5 @@
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../../../core/network/api_client.dart';
 import '../models/occupational_answers.dart';
 import '../models/occupational_assessment_result.dart';
@@ -10,12 +12,36 @@ class OccupationalService {
 
   final ApiClient _apiClient;
 
+  Future<Map<String, String>> _authHeaders({bool required = true}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (required) {
+        throw const ApiException(
+          'Please sign in to access occupational wellness.',
+        );
+      }
+      return const {};
+    }
+    final token = await user.getIdToken();
+    if (token == null || token.isEmpty) {
+      if (required) {
+        throw const ApiException(
+          'Unable to obtain Firebase authorization token. Please sign in again.',
+        );
+      }
+      return const {};
+    }
+    return {'Authorization': 'Bearer $token'};
+  }
+
   Future<OccupationalAssessmentResult> assess(
     OccupationalAnswers answers,
   ) async {
+    final headers = await _authHeaders(required: true);
     final data = await _apiClient.postJson(
       '/occupational/assess',
       answers.toJson(),
+      headers: headers,
       timeout: const Duration(seconds: 60),
     );
     return OccupationalAssessmentResult.fromJson(data);
@@ -24,8 +50,10 @@ class OccupationalService {
   /// Question wording from the server, keyed by question number (1-12), so
   /// wording can be edited without an app release.
   Future<Map<int, String>> getQuestionTexts() async {
+    final headers = await _authHeaders(required: false);
     final data = await _apiClient.getJson(
       '/occupational/questionnaire',
+      headers: headers.isNotEmpty ? headers : null,
       timeout: const Duration(seconds: 15),
     );
     final texts = <int, String>{};
@@ -41,9 +69,15 @@ class OccupationalService {
     return texts;
   }
 
-  Future<OccupationalHistory> getHistory() async {
+  Future<OccupationalHistory> getHistory([String? firebaseUid]) async {
+    final headers = await _authHeaders(required: true);
+    final uid = firebaseUid ?? FirebaseAuth.instance.currentUser?.uid;
+    final path = (uid != null && uid.isNotEmpty)
+        ? '/occupational/history/$uid'
+        : '/occupational/history';
     final data = await _apiClient.getJson(
-      '/occupational/history',
+      path,
+      headers: headers,
       timeout: const Duration(seconds: 30),
     );
     return OccupationalHistory.fromJson(data);
@@ -52,8 +86,10 @@ class OccupationalService {
   /// Fetches per-day completion state for a specific plan (one plan per
   /// assessment - see AssessmentResult.planId).
   Future<OccupationalPlanProgressResponse> getPlanProgress(int planId) async {
+    final headers = await _authHeaders(required: true);
     final data = await _apiClient.getJson(
       '/occupational/plans/$planId/progress',
+      headers: headers,
       timeout: const Duration(seconds: 15),
     );
     return OccupationalPlanProgressResponse.fromJson(data);
@@ -67,9 +103,15 @@ class OccupationalService {
     int dayNumber,
     bool completed,
   ) async {
-    await _apiClient.postJson('/occupational/plans/$planId/progress', {
-      'day_number': dayNumber,
-      'completed': completed,
-    }, timeout: const Duration(seconds: 15));
+    final headers = await _authHeaders(required: true);
+    await _apiClient.postJson(
+      '/occupational/plans/$planId/progress',
+      {
+        'day_number': dayNumber,
+        'completed': completed,
+      },
+      headers: headers,
+      timeout: const Duration(seconds: 15),
+    );
   }
 }

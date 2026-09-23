@@ -69,7 +69,7 @@ class _OccupationalWellnessDashboardState
       return;
     }
     try {
-      final history = await ApiService.instance.getOccupationalHistory();
+      final history = await ApiService.instance.getOccupationalHistory(uid);
       if (!mounted) return;
       setState(() {
         _history = history;

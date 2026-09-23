@@ -13,6 +13,7 @@ import tensorflow as tf
 
 from api.routes.occupational import router as occupational_router
 from core.config import settings
+from services.lstm_report import build_baseline_report
 from database import Base, engine
 import models  # noqa: F401 — registers User + OccupationalAssessment on Base
 
@@ -110,7 +111,7 @@ DAY_FEATURES   = joblib.load(settings.lstm_day_features_path)
 TODAY_FEATURES = joblib.load(settings.lstm_today_features_path)
 SEQ_LEN        = joblib.load(settings.lstm_seq_len_path)
 
-print(f"LSTM loaded ✓  |  seq_len={SEQ_LEN}  |  output key: '{_output_key}'")
+print(f"LSTM loaded [OK]  |  seq_len={SEQ_LEN}  |  output key: '{_output_key}'")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -241,10 +242,14 @@ def predict_lstm(data: PersonalisedPredictInput):
         score01 = float(np.clip(float(result[_output_key].numpy()[0][0]), 0.0, 1.0))
         score10 = round(1 + score01 * 9, 1)
 
+        user_baseline, today_vs_baseline = build_baseline_report(data.today, baseline)
+
         return {
             "prediction":  score10,
             "score_raw":   score01,
             "stress_level": get_burnout_level_lstm(score01),
+            "user_baseline":     user_baseline,
+            "today_vs_baseline": today_vs_baseline,
         }
 
     except Exception as e:

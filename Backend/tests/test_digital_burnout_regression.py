@@ -71,10 +71,19 @@ def test_predict_lstm(main_client):
     r = main_client.post("/predict_lstm", json={"history": [DAY] * main.SEQ_LEN, "today": DAY})
     assert r.status_code == 200, r.text
     body = r.json()
-    assert set(body) == {"prediction", "score_raw", "stress_level"}
+    # The original three fields are unchanged; the baseline blocks are additive
+    # and are what the Flutter monitoring screen reads.
+    assert {"prediction", "score_raw", "stress_level"} <= set(body)
     assert 1 <= body["prediction"] <= 10
     assert 0 <= body["score_raw"] <= 1
     assert any(level in body["stress_level"] for level in LEVELS)
+    assert {"avg_screen_time", "avg_social_ratio", "avg_work_ratio", "avg_app_switches"} <= set(
+        body["user_baseline"]
+    )
+    assert {
+        "screen_zscore", "social_zscore", "screen_time_delta",
+        "social_ratio_delta", "work_ratio_delta", "sleep_delta",
+    } <= set(body["today_vs_baseline"])
 
 
 def test_predict_lstm_requires_exact_history_length(main_client):
