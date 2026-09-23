@@ -46,21 +46,25 @@ class VeerMitraAppBar extends StatelessWidget implements PreferredSizeWidget {
             borderRadius: BorderRadius.circular(6),
             child: Image.asset(
               'assets/logo.png',
-              width: 28,
-              height: 28,
+              width: 26,
+              height: 26,
               fit: BoxFit.contain,
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
 
           /// App Title
-          Text(
-            'VEER MITRA',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.0,
-              color: isDark ? AppColors.darkTextPrimary : AppColors.lightPrimaryNavy,
+          Expanded(
+            child: Text(
+              'VEER MITRA',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.0,
+                color: isDark ? AppColors.darkTextPrimary : AppColors.lightPrimaryNavy,
+              ),
             ),
           ),
         ],

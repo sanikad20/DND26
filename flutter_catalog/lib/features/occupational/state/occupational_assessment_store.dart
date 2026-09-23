@@ -1,42 +1,51 @@
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/occupational_assessment_result.dart';
 
-/// Holds the most recently fetched assessment result in memory for the
-/// current app session only.
-///
-/// This intentionally no longer persists to SharedPreferences under a
-/// single fixed key: that meant every new assessment silently overwrote
-/// whatever was there before, with no link back to which assessment it
-/// came from. Now that /occupational/assess returns `id` and `plan_id`
-/// (see AssessmentResult / OccupationalAssessmentResult), each result can
-/// be tied to its own plan instead of collapsing into one shared slot.
-///
-/// NOTE: the backend's /occupational/history endpoint only
-/// returns lightweight points (id, timestamp, score, risk_level, plan_id) -
-/// it does NOT return the full recommendation/plan detail. So this store
-/// can only ever hold "the result of the assessment the user just took in
-/// this session"; reconstructing full detail for a past assessment after
-/// an app restart would need a new backend endpoint
-/// (e.g. GET /occupational/assessments/{id}) that isn't in scope here.
-/// Until that exists, screens needing "the latest assessment" after a
-/// fresh app launch should fall back to prompting a new assessment rather
-/// than pretending to recover full detail from history.
+/// Holds the most recently fetched assessment result in memory and persists to
+/// SharedPreferences so the dashboard retains current assessment risk, score,
+/// indicators, and recommendations across app restarts.
 class OccupationalAssessmentStore {
   OccupationalAssessmentStore._();
 
   static final OccupationalAssessmentStore instance =
       OccupationalAssessmentStore._();
 
+  static const String _storageKey = 'latest_occupational_assessment_v1';
+
   OccupationalAssessmentResult? _latestAssessment;
 
   OccupationalAssessmentResult? get latestAssessment => _latestAssessment;
 
-  /// Sets the in-memory "latest" pointer right after a fresh /assess call.
-  /// Nothing is written to disk.
-  void setLatestAssessment(OccupationalAssessmentResult result) {
-    _latestAssessment = result;
+  /// Loads the persisted latest assessment from SharedPreferences if present.
+  Future<OccupationalAssessmentResult?> loadFromDisk() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawJson = prefs.getString(_storageKey);
+      if (rawJson != null && rawJson.isNotEmpty) {
+        final data = jsonDecode(rawJson) as Map<String, dynamic>;
+        _latestAssessment = OccupationalAssessmentResult.fromJson(data);
+      }
+    } catch (_) {
+      // Graceful fallback if storage corrupted
+    }
+    return _latestAssessment;
   }
 
-  void clear() {
+  /// Sets and persists the latest assessment result.
+  Future<void> setLatestAssessment(OccupationalAssessmentResult result) async {
+    _latestAssessment = result;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_storageKey, jsonEncode(result.toJson()));
+    } catch (_) {}
+  }
+
+  Future<void> clear() async {
     _latestAssessment = null;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_storageKey);
+    } catch (_) {}
   }
 }

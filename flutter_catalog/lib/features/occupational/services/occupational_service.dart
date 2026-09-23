@@ -71,9 +71,10 @@ class OccupationalService {
 
   Future<OccupationalHistory> getHistory([String? firebaseUid]) async {
     final headers = await _authHeaders(required: true);
-    final uid = firebaseUid ?? FirebaseAuth.instance.currentUser?.uid;
-    final path = (uid != null && uid.isNotEmpty)
-        ? '/occupational/history/$uid'
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    // Call /occupational/history directly when requesting own history to prevent path UID mismatch 403 errors
+    final path = (firebaseUid != null && firebaseUid.isNotEmpty && firebaseUid != currentUid)
+        ? '/occupational/history/$firebaseUid'
         : '/occupational/history';
     final data = await _apiClient.getJson(
       path,

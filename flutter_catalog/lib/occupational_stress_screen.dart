@@ -377,10 +377,10 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
         showProfileButton: true,
         extraActions: [
           if (_hasResult)
-            TextButton.icon(
-              onPressed: _returnToDashboard,
+            IconButton(
               icon: const Icon(Icons.dashboard_outlined),
-              label: const Text('Dashboard'),
+              tooltip: 'Dashboard',
+              onPressed: _returnToDashboard,
             ),
         ],
       ),
@@ -1491,8 +1491,11 @@ class _RiskSummaryCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 8,
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -1504,29 +1507,32 @@ class _RiskSummaryCard extends StatelessWidget {
                   result.riskLevel.toUpperCase(),
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
-              const Spacer(),
-              Text(
-                'Score: ${result.score}',
-                style: TextStyle(
-                  color: theme.textTheme.titleLarge?.color,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: Text(
-                  ' / 100',
-                  style: TextStyle(
-                    color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
-                    fontSize: 14,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    'Score: ${result.score}',
+                    style: TextStyle(
+                      color: theme.textTheme.titleLarge?.color,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
+                  Text(
+                    ' / 100',
+                    style: TextStyle(
+                      color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

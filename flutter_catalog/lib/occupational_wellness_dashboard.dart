@@ -31,7 +31,16 @@ class _OccupationalWellnessDashboardState
   void initState() {
     super.initState();
     _loadBurnoutHistory();
-    _loadHistory();
+    _initDashboardData();
+  }
+
+  Future<void> _initDashboardData() async {
+    final stored = await OccupationalAssessmentStore.instance.loadFromDisk();
+    if (stored != null && mounted) {
+      setState(() => _latestAssessment = stored);
+      _attachPlanProgress(stored);
+    }
+    await _loadHistory();
   }
 
   Future<void> _loadBurnoutHistory() async {
@@ -69,11 +78,12 @@ class _OccupationalWellnessDashboardState
       return;
     }
     try {
-      final history = await ApiService.instance.getOccupationalHistory(uid);
+      final history = await ApiService.instance.getOccupationalHistory();
       if (!mounted) return;
       setState(() {
         _history = history;
         _historyLoading = false;
+        _historyError = null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -94,6 +104,7 @@ class _OccupationalWellnessDashboardState
       MaterialPageRoute(
         builder: (_) => OccupationalConsentScreen(
           onAssessmentComplete: (assessment) {
+            OccupationalAssessmentStore.instance.setLatestAssessment(assessment);
             setState(() => _latestAssessment = assessment);
             _attachPlanProgress(assessment);
             _loadHistory();
@@ -103,6 +114,7 @@ class _OccupationalWellnessDashboardState
     );
 
     if (result != null && mounted) {
+      await OccupationalAssessmentStore.instance.setLatestAssessment(result);
       setState(() => _latestAssessment = result);
       _attachPlanProgress(result);
       _loadHistory();
@@ -117,6 +129,9 @@ class _OccupationalWellnessDashboardState
             OccupationalWellnessPlanScreen(assessment: _latestAssessment),
       ),
     );
+    if (mounted && _planProgress != null) {
+      _planProgress!.load(force: true);
+    }
   }
 
   Color _riskColor(String? level) {
@@ -272,14 +287,14 @@ class _OccupationalWellnessDashboardState
                             ? _PlanSummary(
                                 total: planTotal,
                                 completed: 0,
-                                started: false,
+                                planProgress: null,
                                 onContinue: _openAssessment,
-                                continueLabel: 'Take Assessment',
+                                overrideLabel: 'Take Assessment',
                               )
                             : _PlanSummary(
                                 total: planTotal,
                                 completed: planProgress?.completedCount ?? 0,
-                                started: planProgress?.started ?? false,
+                                planProgress: planProgress,
                                 onContinue: _openPlan,
                               ),
                       );
@@ -577,21 +592,36 @@ class _InsightRow extends StatelessWidget {
 class _PlanSummary extends StatelessWidget {
   final int total;
   final int completed;
-  final bool started;
+  final OccupationalPlanProgress? planProgress;
   final VoidCallback onContinue;
-  final String continueLabel;
+  final String? overrideLabel;
 
   const _PlanSummary({
     required this.total,
     required this.completed,
-    required this.started,
+    required this.planProgress,
     required this.onContinue,
-    this.continueLabel = 'Continue Plan',
+    this.overrideLabel,
   });
+
+  String get _buttonLabel {
+    if (overrideLabel != null) return overrideLabel!;
+    if (planProgress == null) return 'Start Plan';
+
+    switch (planProgress!.status) {
+      case PlanStatus.notStarted:
+        return 'Start Plan';
+      case PlanStatus.active:
+        return 'Continue Day ${planProgress!.currentDay}';
+      case PlanStatus.completed:
+        return 'View Completed Plan';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isStarted = planProgress?.started ?? false;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -613,7 +643,7 @@ class _PlanSummary extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          started
+          isStarted
               ? 'Continue the plan from your latest assessment.'
               : 'Start the plan after your assessment, then mark each day complete.',
           style: TextStyle(
@@ -628,7 +658,7 @@ class _PlanSummary extends StatelessWidget {
           child: OutlinedButton.icon(
             onPressed: onContinue,
             icon: const Icon(Icons.calendar_today_outlined),
-            label: Text(continueLabel),
+            label: Text(_buttonLabel),
           ),
         ),
       ],

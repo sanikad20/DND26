@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'features/occupational/models/occupational_assessment_result.dart';
 import 'features/occupational/services/occupational_plan_builder.dart';
+import 'features/occupational/state/occupational_assessment_store.dart';
 import 'features/occupational/state/occupational_plan_progress.dart';
 import 'features/occupational/widgets/occupational_plan_day_card.dart';
 import 'theme/app_theme.dart';
@@ -25,17 +26,31 @@ class OccupationalWellnessPlanScreen extends StatefulWidget {
 
 class _OccupationalWellnessPlanScreenState
     extends State<OccupationalWellnessPlanScreen> {
+  OccupationalAssessmentResult? _assessment;
   OccupationalPlanProgress? _progress;
 
   @override
   void initState() {
     super.initState();
-    final planId = widget.assessment?.planId;
-    if (planId != null) {
+    _initPlan();
+  }
+
+  Future<void> _initPlan() async {
+    _assessment = widget.assessment ??
+        OccupationalAssessmentStore.instance.latestAssessment ??
+        await OccupationalAssessmentStore.instance.loadFromDisk();
+
+    final planId = _assessment?.planId;
+    if (planId != null && mounted) {
       final progress = OccupationalPlanProgress(planId: planId);
       progress.addListener(_refresh);
-      progress.load();
-      _progress = progress;
+      await progress.load();
+      if (!mounted) return;
+      setState(() {
+        _progress = progress;
+      });
+    } else if (mounted) {
+      setState(() {});
     }
   }
 
@@ -51,12 +66,13 @@ class _OccupationalWellnessPlanScreenState
 
   @override
   Widget build(BuildContext context) {
+    final assessment = _assessment;
     final progress = _progress;
-    final days = buildOccupationalPlanDays(widget.assessment);
+    final days = buildOccupationalPlanDays(assessment);
     final totalDays = days.length;
     final isMaintain = totalDays < 7;
-    final nextDay = progress?.nextOpenDay(totalDays) ?? 1;
-    final riskLevel = widget.assessment?.riskLevel ?? 'Assessment pending';
+    final nextDay = progress?.currentDay ?? 1;
+    final riskLevel = assessment?.riskLevel ?? 'Assessment pending';
 
     return Scaffold(
       appBar: const VeerMitraAppBar(),
@@ -75,6 +91,7 @@ class _OccupationalWellnessPlanScreenState
                     _PlanHeader(
                       completed: progress.completedCount,
                       started: progress.started,
+                      status: progress.status,
                       riskLevel: riskLevel,
                       totalDays: totalDays,
                       isMaintain: isMaintain,
@@ -148,6 +165,7 @@ class _NoPlanNotice extends StatelessWidget {
 class _PlanHeader extends StatelessWidget {
   final int completed;
   final bool started;
+  final PlanStatus? status;
   final String riskLevel;
   final int totalDays;
   final bool isMaintain;
@@ -159,6 +177,7 @@ class _PlanHeader extends StatelessWidget {
   const _PlanHeader({
     required this.completed,
     required this.started,
+    this.status,
     required this.riskLevel,
     required this.totalDays,
     required this.isMaintain,
@@ -170,7 +189,7 @@ class _PlanHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final allDone = completed >= totalDays;
+    final allDone = completed >= totalDays || status == PlanStatus.completed;
     final theme = Theme.of(context);
     final isDark = ThemeController.instance.isDarkMode;
     final primaryTextColor = isDark ? AppColors.darkTextPrimary : AppColors.lightPrimaryNavy;
@@ -232,7 +251,7 @@ class _PlanHeader extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           LinearProgressIndicator(
-            value: completed / totalDays,
+            value: totalDays == 0 ? 0 : completed / totalDays,
             minHeight: 6,
             borderRadius: BorderRadius.circular(10),
             backgroundColor: theme.dividerColor,
@@ -271,7 +290,7 @@ class _PlanHeader extends StatelessWidget {
                 onPressed: !started || allDone ? null : onNext,
                 icon: const Icon(Icons.check_circle_outline),
                 label: Text(
-                  allDone ? 'All Days Complete' : 'Complete Day $nextDay',
+                  allDone ? 'All Days Complete 🎉' : 'Complete Day $nextDay',
                 ),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(

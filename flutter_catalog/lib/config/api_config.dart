@@ -12,7 +12,7 @@ class ApiConfig {
   static final ApiConfig instance = ApiConfig._();
 
   static const _key = 'backend_base_url';
-  static const _defaultUrl = 'http://10.48.117.154:8000';
+  static const _defaultUrl = 'http://192.168.29.99:8000';
 
   /// Empty unless the app was built/run with --dart-define=API_BASE_URL=...
   static const _buildTimeUrl = String.fromEnvironment('API_BASE_URL');
