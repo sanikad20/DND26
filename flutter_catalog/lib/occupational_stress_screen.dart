@@ -113,7 +113,11 @@ class _OccupationalStressScreenState extends State<OccupationalStressScreen> {
       OccupationalAssessmentStore.instance.setLatestAssessment(assessment);
 
       _planProgress?.removeListener(_refreshPlanState);
-      final planProgress = OccupationalPlanProgress(planId: assessment.planId);
+      final planDays = buildOccupationalPlanDays(assessment);
+      final planProgress = OccupationalPlanProgress(
+        planId: assessment.planId,
+        totalDays: planDays.length,
+      );
       planProgress.addListener(_refreshPlanState);
       await planProgress.load();
       if (!mounted) return;
@@ -1024,7 +1028,7 @@ class _WellnessPlanPanel extends StatelessWidget {
     final isMaintain = total < 7;
 
     return _Panel(
-      title: isMaintain ? 'Maintain Plan' : '7-Day Wellness Plan',
+      title: isMaintain ? '3-Day Plan' : '7-Day Wellness Plan',
       subtitle: 'Interactive wellness actions.',
       trailing: started
           ? Text(
@@ -1053,7 +1057,7 @@ class _WellnessPlanPanel extends StatelessWidget {
                 onPressed: onStart,
                 icon: const Icon(Icons.calendar_today_outlined),
                 label: Text(
-                  isMaintain ? 'Start Maintain Plan' : 'Start 7-Day Plan',
+                  isMaintain ? 'Start 3-Day Plan' : 'Start 7-Day Plan',
                 ),
               ),
             ),
@@ -1065,7 +1069,11 @@ class _WellnessPlanPanel extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: onOpenPlan,
                 icon: const Icon(Icons.open_in_new),
-                label: const Text('Open 7-Day Wellness Plan'),
+                label: Text(
+                  isMaintain
+                      ? 'Open 3-Day Plan'
+                      : 'Open 7-Day Wellness Plan',
+                ),
               ),
             ),
             const SizedBox(height: 14),
@@ -1769,7 +1777,7 @@ class _EmptyResultState extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Your result will show the current risk level, score, contributors, protective factors, recommendations, and a 7-day plan.',
+            'Your result will show the current risk level, score, contributors, protective factors, recommendations, and a wellness plan (3-day for low risk, 7-day for moderate/high).',
             style: TextStyle(
               color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.8),
               fontSize: 13,

@@ -2,11 +2,42 @@ import '../models/occupational_assessment_result.dart';
 import '../models/occupational_plan_day.dart';
 
 List<OccupationalPlanDay> buildOccupationalPlanDays(
-  OccupationalAssessmentResult? result,
-) {
+  OccupationalAssessmentResult? result, {
+  String? fallbackRiskLevel,
+}) {
   // The backend is the source of truth for the plan. The rules below are only
   // a fallback for assessments saved by an older app version.
   if (result != null && result.plan.isNotEmpty) return result.plan;
+
+  final effectiveRisk = (result?.riskLevel ?? fallbackRiskLevel)?.toLowerCase();
+  if (effectiveRisk == 'low') {
+    return const [
+      OccupationalPlanDay(
+        day: 1,
+        title: 'Use your leave',
+        explanation: 'Keep this going while things are steady.',
+        tasks: [
+          'Keep taking your leave days as they come up rather than banking them.',
+        ],
+      ),
+      OccupationalPlanDay(
+        day: 2,
+        title: 'Keep your check-in',
+        explanation: 'Keep this going while things are steady.',
+        tasks: [
+          'Keep your weekly check-in with a trusted senior/peer going.',
+        ],
+      ),
+      OccupationalPlanDay(
+        day: 3,
+        title: 'Protect a rest day',
+        explanation: 'Keep this going while things are steady.',
+        tasks: [
+          'Protect at least one full rest day a week, even during busier stretches.',
+        ],
+      ),
+    ];
+  }
 
   final labels = result?.contributorLabels.join(' ').toLowerCase() ?? '';
   final recoveryFocus =

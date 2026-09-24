@@ -42,7 +42,11 @@ class _OccupationalWellnessPlanScreenState
 
     final planId = _assessment?.planId;
     if (planId != null && mounted) {
-      final progress = OccupationalPlanProgress(planId: planId);
+      final days = buildOccupationalPlanDays(_assessment);
+      final progress = OccupationalPlanProgress(
+        planId: planId,
+        totalDays: days.length,
+      );
       progress.addListener(_refresh);
       await progress.load();
       if (!mounted) return;
@@ -71,6 +75,9 @@ class _OccupationalWellnessPlanScreenState
     final days = buildOccupationalPlanDays(assessment);
     final totalDays = days.length;
     final isMaintain = totalDays < 7;
+    if (progress != null) {
+      progress.updateTotalDays(totalDays);
+    }
     final nextDay = progress?.currentDay ?? 1;
     final riskLevel = assessment?.riskLevel ?? 'Assessment pending';
 
@@ -228,7 +235,7 @@ class _PlanHeader extends StatelessWidget {
                   children: [
                     Text(
                       isMaintain
-                          ? 'Keep-It-Steady Plan'
+                          ? '3-Day Maintain Plan'
                           : 'Interactive 7-Day Wellness Plan',
                       style: TextStyle(
                         color: primaryTextColor,

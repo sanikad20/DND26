@@ -13,10 +13,12 @@ enum PlanStatus {
 class OccupationalPlanProgress extends ChangeNotifier {
   OccupationalPlanProgress({
     required this.planId,
+    this.totalDays = 7,
     OccupationalService? service,
   }) : _service = service ?? OccupationalService();
 
   final int planId;
+  int totalDays;
   final OccupationalService _service;
 
   bool _loaded = false;
@@ -28,29 +30,41 @@ class OccupationalPlanProgress extends ChangeNotifier {
   bool get loaded => _loaded;
   PlanStatus get status => _status;
   bool get started => _status != PlanStatus.notStarted || _completedDays.isNotEmpty;
-  bool get isCompleted => _status == PlanStatus.completed || _completedDays.length >= 7;
+  bool get isCompleted =>
+      _status == PlanStatus.completed ||
+      (totalDays > 0 && _completedDays.length >= totalDays);
 
   DateTime? get startDate => _startDate;
   DateTime? get lastUpdated => _lastUpdated;
   Set<int> get completedDays => Set.unmodifiable(_completedDays);
   int get completedCount => _completedDays.length;
-  double get progress => (completedCount / 7).clamp(0.0, 1.0);
+  double get progress =>
+      totalDays <= 0 ? 0.0 : (completedCount / totalDays).clamp(0.0, 1.0);
 
-  /// Current active day (1..7). If completed, returns 7.
-  int get currentDay {
-    if (isCompleted) return 7;
-    for (var day = 1; day <= 7; day++) {
-      if (!_completedDays.contains(day)) return day;
+  void updateTotalDays(int count) {
+    if (count > 0 && totalDays != count) {
+      totalDays = count;
+      _completedDays.removeWhere((d) => d > totalDays || d < 1);
+      _reevaluateStatus();
+      notifyListeners();
     }
-    return 7;
   }
 
-  /// Intended calendar day based on start date (date-aware), clamped 1..7.
+  /// Current active day (1..totalDays). If completed, returns totalDays.
+  int get currentDay {
+    if (isCompleted) return totalDays;
+    for (var day = 1; day <= totalDays; day++) {
+      if (!_completedDays.contains(day)) return day;
+    }
+    return totalDays;
+  }
+
+  /// Intended calendar day based on start date (date-aware), clamped 1..totalDays.
   /// Does NOT automatically mark days complete.
   int get intendedDay {
     if (_startDate == null) return 1;
     final daysElapsed = DateTime.now().difference(_startDate!).inDays;
-    return (daysElapsed + 1).clamp(1, 7);
+    return (daysElapsed + 1).clamp(1, totalDays);
   }
 
   String get _keyStatus => 'occupational_plan_status_$planId';
@@ -88,7 +102,7 @@ class OccupationalPlanProgress extends ChangeNotifier {
       if (rawCompleted != null) {
         for (final item in rawCompleted) {
           final dayNum = int.tryParse(item);
-          if (dayNum != null && dayNum >= 1 && dayNum <= 7) {
+          if (dayNum != null && dayNum >= 1 && dayNum <= totalDays) {
             _completedDays.add(dayNum);
           }
         }
@@ -99,13 +113,14 @@ class OccupationalPlanProgress extends ChangeNotifier {
     try {
       final response = await _service.getPlanProgress(planId);
       for (final dayNum in response.completedDayNumbers) {
-        if (dayNum >= 1 && dayNum <= 7) {
+        if (dayNum >= 1 && dayNum <= totalDays) {
           _completedDays.add(dayNum);
         }
       }
     } catch (_) {}
 
     // 3. Re-evaluate status & enforce state invariant
+    _completedDays.removeWhere((d) => d > totalDays || d < 1);
     _reevaluateStatus();
     _loaded = true;
     await _saveToDisk();
@@ -113,7 +128,7 @@ class OccupationalPlanProgress extends ChangeNotifier {
   }
 
   void _reevaluateStatus() {
-    if (_completedDays.length >= 7) {
+    if (totalDays > 0 && _completedDays.length >= totalDays) {
       _status = PlanStatus.completed;
     } else if (_completedDays.isNotEmpty || _status == PlanStatus.active) {
       _status = PlanStatus.active;
@@ -154,9 +169,9 @@ class OccupationalPlanProgress extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Toggles day completion status (1..7).
+  /// Toggles day completion status (1..totalDays).
   Future<void> setDayCompleted(int day, bool completed) async {
-    if (day < 1 || day > 7) return;
+    if (day < 1 || day > totalDays) return;
 
     final changed = completed
         ? _completedDays.add(day)

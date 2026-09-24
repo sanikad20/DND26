@@ -130,7 +130,7 @@ class HomeScreen extends StatelessWidget {
               /// Feature 3: Wellness Dashboard
               _FeatureCard(
                 title: 'WELLNESS DASHBOARD',
-                subtitle: 'View assessment history, trends and 7-day wellness plans.',
+                subtitle: 'View assessment history, trends and personalized wellness plans.',
                 icon: Icons.space_dashboard_outlined,
                 iconColor: theme.colorScheme.secondary,
                 buttonText: 'View Dashboard',

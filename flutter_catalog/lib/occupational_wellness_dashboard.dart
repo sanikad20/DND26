@@ -57,7 +57,11 @@ class _OccupationalWellnessDashboardState
 
   void _attachPlanProgress(OccupationalAssessmentResult assessment) {
     _planProgress?.removeListener(_refreshPlanState);
-    final progress = OccupationalPlanProgress(planId: assessment.planId);
+    final days = buildOccupationalPlanDays(assessment);
+    final progress = OccupationalPlanProgress(
+      planId: assessment.planId,
+      totalDays: days.length,
+    );
     progress.addListener(_refreshPlanState);
     progress.load();
     _planProgress = progress;
@@ -180,7 +184,7 @@ class _OccupationalWellnessDashboardState
     if (labels.contains('control')) {
       return 'Pick one flexible part of the next duty block that can be clarified, sequenced, or simplified.';
     }
-    if (result.riskLevel == 'Low') {
+    if (result.riskLevel.toLowerCase() == 'low') {
       return 'Maintain your current protective routines and reassess next week.';
     }
     return 'Start the 7-day plan and focus on one manageable wellness action today.';
@@ -279,10 +283,14 @@ class _OccupationalWellnessDashboardState
                       );
                       final planTotal = buildOccupationalPlanDays(
                         result,
+                        fallbackRiskLevel: displayRiskLevel,
                       ).length;
                       final planProgress = _planProgress;
+                      if (planProgress != null) {
+                        planProgress.updateTotalDays(planTotal);
+                      }
                       final plan = _DashboardPanel(
-                        title: planTotal < 7 ? 'Maintain Plan' : '7-Day Plan',
+                        title: planTotal <= 3 ? '3-Day Plan' : '7-Day Plan',
                         child: result == null
                             ? _PlanSummary(
                                 total: planTotal,
@@ -607,6 +615,9 @@ class _PlanSummary extends StatelessWidget {
   String get _buttonLabel {
     if (overrideLabel != null) return overrideLabel!;
     if (planProgress == null) return 'Start Plan';
+    if (total > 0 && completed >= total) {
+      return 'View Completed Plan';
+    }
 
     switch (planProgress!.status) {
       case PlanStatus.notStarted:
