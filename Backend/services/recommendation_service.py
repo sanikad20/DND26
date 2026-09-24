@@ -186,7 +186,7 @@ class RecommendationService:
         middle days (2-4) are built from the top 3 contributors, so two High
         results with different causes get different plans (Section 6.3).
         Day 7 is always "Repeat the assessment" — it powers the trend."""
-        if risk_level == "Low":
+        if risk_level.strip().lower() == "low":
             return [
                 self._checked_day(
                     DayPlanItem(
