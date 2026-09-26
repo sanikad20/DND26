@@ -16,6 +16,31 @@
 
 ---
 
+## 🎯 Smart India Hackathon (SIH 2026) Problem Statement
+
+| Attribute | Details |
+| :--- | :--- |
+| **Problem Statement ID** | `20180` |
+| **Title** | **AI-Based Predictive Personnel Stress and Welfare Monitoring System for Uniformed Forces** |
+| **Ministry / Organization** | **Ministry of Home Affairs (MHA)** |
+| **Department** | **Central Reserve Police Force (CRPF)**, Police II Division |
+| **Category** | Software |
+| **Theme** | MedTech / BioTech / HealthTech |
+
+### 📖 Problem Background & Context
+Personnel serving in **Central Armed Police Forces (CAPFs)**, Armed Forces, and other uniformed services operate under physically demanding, psychologically stressful, and hazardous conditions. Extended deployments, operational pressures, separation from families, irregular working hours, and exposure to high-stress incidents significantly impact mental well-being.
+
+Traditional stress detection depends on manual observation and delayed self-reporting, creating critical gaps in early intervention.
+
+### 💡 Proposed Solution Scope
+**Veer Mitra** solves this challenge through an AI-powered, proactive early-warning and welfare monitoring system:
+* **Operational & HR Ingestion**: Analyzes duty schedules, deployment durations, night-shift density, rest intervals, and leave patterns.
+* **Privacy-Preserving Self-Assessments**: Secure mobile assessments evaluating validated clinical and occupational constructs (Demand, Control, Support, Effort-Reward).
+* **AI-Driven Behavioral Telemetry**: Continuous, consent-driven detection of digital behavioral fatigue and burnout indicators.
+* **Closed-Loop Actionable Welfare**: Personalized 7-day recovery programs and aggregate, anonymized readiness insights for unit commanders and welfare officers.
+
+---
+
 ## 🌟 Core Modules & Capabilities
 
 ### 1. 🔍 Continuous Digital Burnout Monitoring
@@ -279,8 +304,25 @@ brainlag/
 2. **Strict User Ownership**: Database repositories filter all queries by the authenticated user's Firebase UID. Users cannot view or modify another individual's assessment records.
 3. **Explicit Consent**: Continuous digital monitoring and occupational surveys require explicit user agreement before data capture.
 
+## 👥 Team Details — Team DND
+
+**Smart India Hackathon (SIH 2026)**  
+- **Team Name**: Team DND  
+- **Team ID**: `132931`  
+- **College / Institute**: Veermata Jijabai Technological Institute (VJTI), Mumbai  
+
+| Name | Role |
+| :--- | :--- |
+| **Sanika Deshmukh** | Team Leader |
+| **Divya Addagatla** | Team Member |
+| **Pragati Kharat** | Team Member |
+| **Arya Borkar** | Team Member |
+| **Dhriti Jain** | Team Member |
+| **Girija Vibhute** | Team Member |
+
 ---
 
 ## 📄 License
 
 This project is developed for institutional wellness and operational resilience. Distributed under the MIT License.
+
