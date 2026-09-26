@@ -48,7 +48,19 @@
 
 ---
 
-## 🏗️ 6-Tier System Architecture
+## 🏗️ System Architecture Diagrams
+
+### 1. High-Level 6-Tier Architecture Overview
+![Veer Mitra - System Architecture](docs/images/system_architecture.jpeg)
+
+---
+
+### 2. End-to-End Service & Component Flow
+![Veer Mitra - Component Flow Diagram](docs/images/component_flow.png)
+
+---
+
+### 3. Interactive Architecture Data Flow
 
 ```mermaid
 graph TD
