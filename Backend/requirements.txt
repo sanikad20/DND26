@@ -3,7 +3,7 @@ uvicorn
 sqlalchemy
 pydantic[email]
 passlib[bcrypt]
-torch
+
 tensorflow
 joblib
 numpy
