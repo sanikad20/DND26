@@ -3,10 +3,14 @@
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com)
+[![Render](https://img.shields.io/badge/Render-46E3B7?style=for-the-badge&logo=render&logoColor=black)](https://render.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)](https://pytorch.org)
 [![TensorFlow](https://img.shields.io/badge/TensorFlow-FF6F00?style=for-the-badge&logo=tensorflow&logoColor=white)](https://tensorflow.org)
 [![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
 [![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://sqlite.org)
+[![Live Status](https://img.shields.io/badge/Render%20Status-Live%20✓-success?style=for-the-badge&logo=render&logoColor=black)](https://veer-mitra-backend.onrender.com)
+
 
 ---
 
@@ -182,6 +186,8 @@ graph TD
 
 ### Backend Service (`Backend/`)
 * **Core Framework**: FastAPI, Uvicorn, Starlette
+* **Containerization**: Docker (multi-stage CPU PyTorch + TensorFlow runtime)
+* **Cloud Hosting**: Render Web Service (`https://veer-mitra-backend.onrender.com`)
 * **Data Layer**: SQLAlchemy 2.0, SQLite (development / standalone), Alembic migrations
 * **Machine Learning**: PyTorch 2.x, TensorFlow 2.x, Scikit-Learn, Joblib, NumPy, Pandas
 * **Security & Auth**: Firebase Admin SDK (JWT Bearer token verification)
@@ -189,16 +195,37 @@ graph TD
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Deployment & Getting Started
 
-### Prerequisites
-* Python 3.10 or higher
-* Flutter SDK (3.24.x or higher) & Android Studio / Xcode
-* Firebase Project credentials (for production authentication)
+### ☁️ Option 1: Live Cloud Backend (Render)
+The backend is containerized via Docker and continuously deployed on Render:
+* **Live Base URL**: [`https://veer-mitra-backend.onrender.com`](https://veer-mitra-backend.onrender.com)
+* **Interactive Swagger UI**: [`https://veer-mitra-backend.onrender.com/docs`](https://veer-mitra-backend.onrender.com/docs)
+* **Alternative ReDoc**: [`https://veer-mitra-backend.onrender.com/redoc`](https://veer-mitra-backend.onrender.com/redoc)
+* **Service Name**: `veer-mitra-backend` *(Dockerized Web Service)*
+* **Continuous Deployment**: Linked to GitHub repository branch `main` with automatic builds on push.
 
 ---
 
-### Backend Setup
+### 🐳 Option 2: Run with Docker (Local Container)
+
+1. **Build the Docker Image**:
+   ```bash
+   cd Backend
+   docker build -t veer-mitra-backend .
+   ```
+
+2. **Run the Container**:
+   ```bash
+   docker run -d -p 8000:8000 --name veer-mitra-backend veer-mitra-backend
+   ```
+
+3. **Verify running instance**:
+   * Open [http://localhost:8000/docs](http://localhost:8000/docs) in your browser.
+
+---
+
+### 💻 Option 3: Local Python Environment Setup
 
 1. **Navigate to the Backend directory**:
    ```bash
@@ -225,7 +252,9 @@ graph TD
 
 ---
 
-### Mobile Frontend Setup
+### 📱 Mobile Frontend Setup (`flutter_catalog`)
+
+The Flutter application connects by default to the live Render backend (`https://veer-mitra-backend.onrender.com`).
 
 1. **Navigate to the Flutter directory**:
    ```bash
@@ -244,7 +273,11 @@ graph TD
 
 4. **Launch the Mobile App**:
    ```bash
+   # Connects automatically to the live Render backend:
    flutter run
+
+   # Or point to a local backend instance via build flag:
+   flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
    ```
 
 ---
@@ -280,6 +313,7 @@ brainlag/
 │   ├── database.py                     # Database engine and session lifecycle
 │   ├── models.py                       # SQLAlchemy ORM entity models
 │   ├── main.py                         # Application entrypoint & ML model serving
+│   ├── Dockerfile                      # Production Docker container configuration
 │   └── requirements.txt                # Python dependencies
 ├── flutter_catalog/                    # Flutter Mobile Application
 │   ├── lib/
