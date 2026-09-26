@@ -123,4 +123,28 @@ class ApiClient {
       statusCode: response.statusCode,
     );
   }
+
+  Future<List<dynamic>> getJsonList(
+    String path, {
+    Map<String, String>? headers,
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    final reqHeaders = await _headers();
+    if (headers != null) {
+      reqHeaders.addAll(headers);
+    }
+    final response = await _send(
+      () => _httpClient.get(Uri.parse('$_baseUrl$path'), headers: reqHeaders),
+      path,
+      timeout,
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as List<dynamic>;
+    }
+    throw ApiException(
+      '$path error ${response.statusCode}: ${response.body}',
+      statusCode: response.statusCode,
+    );
+  }
 }

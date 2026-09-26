@@ -12,16 +12,24 @@ from typing import List
 import tensorflow as tf
 
 from api.routes.occupational import router as occupational_router
+from api.routes.organizational import router as organizational_router
 from core.config import settings
 from services.lstm_report import build_baseline_report
 from database import Base, engine
 import models  # noqa: F401 — registers User + OccupationalAssessment on Base
+from services.hrms_synthetic_service import HRMSSyntheticService
 
 app = FastAPI()
 
-# Creates any tables that don't exist yet (users, occupational_assessments).
+# Creates any tables that don't exist yet (users, occupational_assessments, organizational tables).
 # Safe to call on every startup — no-ops for tables that already exist.
 Base.metadata.create_all(bind=engine)
+
+# Seed synthetic demonstration data on startup if empty
+try:
+    HRMSSyntheticService().seed_demo_dataset_if_empty()
+except Exception as e:
+    print(f"Demo seeding notice: {e}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -265,3 +273,4 @@ def predict_lstm(data: PersonalisedPredictInput):
 # ─────────────────────────────────────────────────────────────────────────────
 
 app.include_router(occupational_router)
+app.include_router(organizational_router)

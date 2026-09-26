@@ -1,15 +1,105 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'api_service.dart';
 import 'config/api_config.dart';
 import 'theme/app_theme.dart';
 import 'welcome_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
-  /// Lets the user point the app at the right backend (e.g. the laptop's
-  /// current LAN IP) and check it responds, without rebuilding the app.
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  UserProfileRole? _profile;
+  bool _switchingRole = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final p = await ApiService.instance.getMyRole();
+      if (!mounted) return;
+      setState(() {
+        _profile = p;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _switchRole(String newRole) async {
+    setState(() => _switchingRole = true);
+    try {
+      final updated = await ApiService.instance.switchRole(newRole);
+      if (!mounted) return;
+      setState(() {
+        _profile = updated;
+        _switchingRole = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Switched role to ${_formatRoleName(newRole)}. Home dashboard updated.'),
+          backgroundColor: AppColors.riskLow,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _switchingRole = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to switch role: $e'),
+          backgroundColor: AppColors.riskHigh,
+        ),
+      );
+    }
+  }
+
+  Future<void> _toggleOptIn(bool value) async {
+    try {
+      final updated = await ApiService.instance.updateOptIn(value);
+      if (!mounted) return;
+      setState(() => _profile = updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            value
+                ? 'Opted in to demonstration optional wellness features.'
+                : 'Opted out of demonstration optional wellness features.',
+          ),
+          backgroundColor: AppColors.riskLow,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update opt-in: $e'),
+          backgroundColor: AppColors.riskHigh,
+        ),
+      );
+    }
+  }
+
+  String _formatRoleName(String? role) {
+    switch (role) {
+      case 'welfare_officer':
+        return 'Welfare Officer';
+      case 'commander':
+        return 'Unit Commander';
+      case 'admin':
+        return 'Administrator';
+      default:
+        return 'Personnel';
+    }
+  }
+
+  /// Lets the user point the app at the right backend without rebuilding.
   Future<void> _editServerUrl(BuildContext context) async {
     final controller = TextEditingController(text: ApiConfig.instance.baseUrl);
     String? status;
@@ -172,6 +262,9 @@ class ProfileScreen extends StatelessWidget {
     }
     if (displayName.isEmpty) displayName = 'Personnel User';
 
+    final currentRole = _profile?.role ?? 'personnel';
+    final isOptedIn = _profile?.optInOptionalWellness ?? false;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile & Settings'),
@@ -232,8 +325,158 @@ class ProfileScreen extends StatelessWidget {
                                   : AppColors.lightTextSecondary,
                             ),
                           ),
+                          if (_profile != null) ...[
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1E88E5).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    _formatRoleName(currentRole),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF1E88E5),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _profile!.unitId,
+                                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              /// DEMO ROLE SWITCHER SECTION
+              Text(
+                'DEMO ROLE SWITCHER',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: isDark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.lightTextSecondary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Switch active persona to evaluate role-specific dashboards & privacy controls:',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 10),
+
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: theme.dividerColor),
+                ),
+                child: Column(
+                  children: [
+                    _RoleOption(
+                      title: 'Personnel (Individual)',
+                      description: 'Self-assessment, personalized 7-day plans, personal trends.',
+                      roleValue: 'personnel',
+                      currentRole: currentRole,
+                      icon: Icons.person_rounded,
+                      onSelect: _switchingRole ? null : () => _switchRole('personnel'),
+                    ),
+                    const Divider(height: 20),
+                    _RoleOption(
+                      title: 'Welfare Officer',
+                      description: 'Force wellness oversight, active welfare alerts, monitored personnel list.',
+                      roleValue: 'welfare_officer',
+                      currentRole: currentRole,
+                      icon: Icons.health_and_safety_rounded,
+                      onSelect: _switchingRole ? null : () => _switchRole('welfare_officer'),
+                    ),
+                    const Divider(height: 20),
+                    _RoleOption(
+                      title: 'Unit Commander',
+                      description: 'Strictly aggregate unit indicators, shift fatigue, advisory recommendations.',
+                      roleValue: 'commander',
+                      currentRole: currentRole,
+                      icon: Icons.military_tech_rounded,
+                      onSelect: _switchingRole ? null : () => _switchRole('commander'),
+                    ),
+                    const Divider(height: 20),
+                    _RoleOption(
+                      title: 'Administrator',
+                      description: 'System audit logs, cross-unit administration and access review.',
+                      roleValue: 'admin',
+                      currentRole: currentRole,
+                      icon: Icons.admin_panel_settings_rounded,
+                      onSelect: _switchingRole ? null : () => _switchRole('admin'),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              /// OPTIONAL WELLNESS DATA (DEMO OPT-IN)
+              Text(
+                'OPTIONAL WELLNESS DATA (DEMO OPT-IN)',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: isDark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.lightTextSecondary,
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: theme.dividerColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.favorite_outline_rounded, color: AppColors.riskModerate),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'Simulated Biometric / Wearable Streams',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        Switch(
+                          value: isOptedIn,
+                          onChanged: _toggleOptIn,
+                          activeThumbColor: AppColors.riskLow,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Synthetic demonstration data: Requires explicit opt-in. When enabled, simulates optional wearable recovery and sleep stability indicators under strict privacy isolation.',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.3),
                     ),
                   ],
                 ),
@@ -348,6 +591,18 @@ class ProfileScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     _InfoRow(
+                      label: 'Personnel ID',
+                      value: _profile?.personnelId ?? 'Loading...',
+                      isDark: isDark,
+                    ),
+                    const Divider(height: 24),
+                    _InfoRow(
+                      label: 'Assigned Unit',
+                      value: _profile?.unitId ?? 'UNIT-ALPHA',
+                      isDark: isDark,
+                    ),
+                    const Divider(height: 24),
+                    _InfoRow(
                       label: 'Account ID',
                       value: user?.uid ?? 'N/A',
                       isDark: isDark,
@@ -416,6 +671,76 @@ class ProfileScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RoleOption extends StatelessWidget {
+  final String title;
+  final String description;
+  final String roleValue;
+  final String currentRole;
+  final IconData icon;
+  final VoidCallback? onSelect;
+
+  const _RoleOption({
+    required this.title,
+    required this.description,
+    required this.roleValue,
+    required this.currentRole,
+    required this.icon,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isSelected = currentRole == roleValue;
+
+    return InkWell(
+      onTap: onSelect,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              icon,
+              size: 22,
+              color: isSelected ? const Color(0xFF1E88E5) : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: isSelected ? const Color(0xFF1E88E5) : null,
+                        ),
+                      ),
+                      if (isSelected) ...[
+                        const SizedBox(width: 8),
+                        const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF1E88E5)),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    description,
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
