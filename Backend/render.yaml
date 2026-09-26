@@ -1,8 +1,6 @@
 services:
   - type: web
-    name: brainlag-backend
+    name: veer-mitra-backend
     runtime: docker
     plan: free
-    envVars:
-      - key: PORT
-        value: 8000
+    rootDir: Backend
