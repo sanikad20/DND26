@@ -4,3 +4,20 @@ services:
     runtime: docker
     plan: free
     rootDir: Backend
+    healthCheckPath: /health
+    # Required environment variables — set the actual values in the
+    # Render Dashboard -> veer-mitra-backend -> Environment (keep them
+    # out of git; the service account is a secret):
+    #
+    #   FIREBASE_PROJECT_ID           = digital-burnout-821da
+    #   FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 = base64 of the service account
+    #                                   JSON from the SAME project
+    #                                   (digital-burnout-821da)
+    #   APP_ENV                       = production
+    #
+    # The Flutter app is configured (via flutterfire) for project
+    # digital-burnout-821da, so its ID tokens carry
+    # aud: "digital-burnout-821da". The backend credential must belong to the
+    # same project or verify_id_token rejects every token with an
+    # "incorrect aud" error (HTTP 401). FIREBASE_PROJECT_ID alone is NOT
+    # enough — the service account's project must match too.

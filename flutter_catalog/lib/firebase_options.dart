@@ -41,48 +41,46 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyCSE-lQZb5LbQyrj-MmDe8TPoJLG9o5iF8',
-    appId: '1:934390734160:web:76d3b79c8108beda42a055',
-    messagingSenderId: '934390734160',
+    apiKey: 'AIzaSyBZxQCjlqdWkzKlNqc8fSM1eTe3aY0w-Kc',
+    appId: '1:255731454217:web:f5d1cb14c99418645cc3d8',
+    messagingSenderId: '255731454217',
     projectId: 'digital-burnout-821da',
     authDomain: 'digital-burnout-821da.firebaseapp.com',
-    storageBucket: 'digitalburnoutdetection.firebasestorage.app',
-    measurementId: 'G-3EV0YENSSE',
+    storageBucket: 'digital-burnout-821da.firebasestorage.app',
+    measurementId: 'G-MX81GBRREH',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBO-ISlevuBfle4lOAdALulfBICMTtLYtY',
-    appId: '1:934390734160:android:54c19a62119ba27142a055',
-    messagingSenderId: '934390734160',
+    apiKey: 'AIzaSyBShQzU3VBSeTe01Rkdu23rMiRyjT8Qmxs',
+    appId: '1:255731454217:android:a41e28f36ac2e0705cc3d8',
+    messagingSenderId: '255731454217',
     projectId: 'digital-burnout-821da',
-    storageBucket: 'digitalburnoutdetection.firebasestorage.app',
+    storageBucket: 'digital-burnout-821da.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCgxXxbajv7QjsiauRv2K-rTeCcd3IGrdk',
-    appId: '1:934390734160:ios:d8eeec6e20abf02e42a055',
-    messagingSenderId: '934390734160',
+    apiKey: 'AIzaSyBJ4YUMlrZrQ0_PRK-4wLhDvzRitCEf7IQ',
+    appId: '1:255731454217:ios:3e83bd79cc45a8175cc3d8',
+    messagingSenderId: '255731454217',
     projectId: 'digital-burnout-821da',
-    storageBucket: 'digitalburnoutdetection.firebasestorage.app',
+    storageBucket: 'digital-burnout-821da.firebasestorage.app',
     iosBundleId: 'com.example.flutterCatalog',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyCgxXxbajv7QjsiauRv2K-rTeCcd3IGrdk',
-    appId: '1:934390734160:ios:d8eeec6e20abf02e42a055',
-    messagingSenderId: '934390734160',
+    apiKey: 'AIzaSyBJ4YUMlrZrQ0_PRK-4wLhDvzRitCEf7IQ',
+    appId: '1:255731454217:ios:3e83bd79cc45a8175cc3d8',
+    messagingSenderId: '255731454217',
     projectId: 'digital-burnout-821da',
-    storageBucket: 'digitalburnoutdetection.firebasestorage.app',
+    storageBucket: 'digital-burnout-821da.firebasestorage.app',
     iosBundleId: 'com.example.flutterCatalog',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyCSE-lQZb5LbQyrj-MmDe8TPoJLG9o5iF8',
-    appId: '1:934390734160:web:eb38580fae09467942a055',
-    messagingSenderId: '934390734160',
+    apiKey: 'AIzaSyBZxQCjlqdWkzKlNqc8fSM1eTe3aY0w-Kc',
+    appId: '1:255731454217:web:ba1e73cd28a26dab5cc3d8',
+    messagingSenderId: '255731454217',
     projectId: 'digital-burnout-821da',
     authDomain: 'digital-burnout-821da.firebaseapp.com',
-    storageBucket: 'digitalburnoutdetection.firebasestorage.app',
-    measurementId: 'G-11TNBJRZPM',
+    storageBucket: 'digital-burnout-821da.firebasestorage.app',
+    measurementId: 'G-NNGC5QTDKE',
   );
 }

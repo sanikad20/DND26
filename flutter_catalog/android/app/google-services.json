@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "934390734160",
+    "project_number": "255731454217",
     "project_id": "digital-burnout-821da",
-    "storage_bucket": "digitalburnoutdetection.firebasestorage.app"
+    "storage_bucket": "digital-burnout-821da.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:934390734160:android:54c19a62119ba27142a055",
+        "mobilesdk_app_id": "1:255731454217:android:a41e28f36ac2e0705cc3d8",
         "android_client_info": {
           "package_name": "com.example.flutter_catalog"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBO-ISlevuBfle4lOAdALulfBICMTtLYtY"
+          "current_key": "AIzaSyBShQzU3VBSeTe01Rkdu23rMiRyjT8Qmxs"
         }
       ],
       "services": {
