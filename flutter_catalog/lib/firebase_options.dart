@@ -44,8 +44,8 @@ class DefaultFirebaseOptions {
     apiKey: 'AIzaSyCSE-lQZb5LbQyrj-MmDe8TPoJLG9o5iF8',
     appId: '1:934390734160:web:76d3b79c8108beda42a055',
     messagingSenderId: '934390734160',
-    projectId: 'digitalburnoutdetection',
-    authDomain: 'digitalburnoutdetection.firebaseapp.com',
+    projectId: 'digital-burnout-821da',
+    authDomain: 'digital-burnout-821da.firebaseapp.com',
     storageBucket: 'digitalburnoutdetection.firebasestorage.app',
     measurementId: 'G-3EV0YENSSE',
   );
@@ -54,7 +54,7 @@ class DefaultFirebaseOptions {
     apiKey: 'AIzaSyBO-ISlevuBfle4lOAdALulfBICMTtLYtY',
     appId: '1:934390734160:android:54c19a62119ba27142a055',
     messagingSenderId: '934390734160',
-    projectId: 'digitalburnoutdetection',
+    projectId: 'digital-burnout-821da',
     storageBucket: 'digitalburnoutdetection.firebasestorage.app',
   );
 
@@ -62,7 +62,7 @@ class DefaultFirebaseOptions {
     apiKey: 'AIzaSyCgxXxbajv7QjsiauRv2K-rTeCcd3IGrdk',
     appId: '1:934390734160:ios:d8eeec6e20abf02e42a055',
     messagingSenderId: '934390734160',
-    projectId: 'digitalburnoutdetection',
+    projectId: 'digital-burnout-821da',
     storageBucket: 'digitalburnoutdetection.firebasestorage.app',
     iosBundleId: 'com.example.flutterCatalog',
   );
@@ -71,7 +71,7 @@ class DefaultFirebaseOptions {
     apiKey: 'AIzaSyCgxXxbajv7QjsiauRv2K-rTeCcd3IGrdk',
     appId: '1:934390734160:ios:d8eeec6e20abf02e42a055',
     messagingSenderId: '934390734160',
-    projectId: 'digitalburnoutdetection',
+    projectId: 'digital-burnout-821da',
     storageBucket: 'digitalburnoutdetection.firebasestorage.app',
     iosBundleId: 'com.example.flutterCatalog',
   );
@@ -80,8 +80,8 @@ class DefaultFirebaseOptions {
     apiKey: 'AIzaSyCSE-lQZb5LbQyrj-MmDe8TPoJLG9o5iF8',
     appId: '1:934390734160:web:eb38580fae09467942a055',
     messagingSenderId: '934390734160',
-    projectId: 'digitalburnoutdetection',
-    authDomain: 'digitalburnoutdetection.firebaseapp.com',
+    projectId: 'digital-burnout-821da',
+    authDomain: 'digital-burnout-821da.firebaseapp.com',
     storageBucket: 'digitalburnoutdetection.firebasestorage.app',
     measurementId: 'G-11TNBJRZPM',
   );
