@@ -22,7 +22,7 @@ class OccupationalService {
       }
       return const {};
     }
-    final token = await user.getIdToken();
+    final token = await user.getIdToken(true);
     if (token == null || token.isEmpty) {
       if (required) {
         throw const ApiException(
