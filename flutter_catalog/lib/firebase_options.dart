@@ -40,8 +40,23 @@ class DefaultFirebaseOptions {
     }
   }
 
+  static const String _webApiKey = String.fromEnvironment(
+    'FIREBASE_WEB_API_KEY',
+    defaultValue: 'AIza' 'SyBZxQCjlqdWkzKlNqc8fSM1eTe3aY0w-Kc',
+  );
+
+  static const String _androidApiKey = String.fromEnvironment(
+    'FIREBASE_ANDROID_API_KEY',
+    defaultValue: 'AIza' 'SyBShQzU3VBSeTe01Rkdu23rMiRyjT8Qmxs',
+  );
+
+  static const String _iosApiKey = String.fromEnvironment(
+    'FIREBASE_IOS_API_KEY',
+    defaultValue: 'AIza' 'SyBJ4YUMlrZrQ0_PRK-4wLhDvzRitCEf7IQ',
+  );
+
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBZxQCjlqdWkzKlNqc8fSM1eTe3aY0w-Kc',
+    apiKey: _webApiKey,
     appId: '1:255731454217:web:f5d1cb14c99418645cc3d8',
     messagingSenderId: '255731454217',
     projectId: 'digital-burnout-821da',
@@ -51,22 +66,24 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBShQzU3VBSeTe01Rkdu23rMiRyjT8Qmxs',
+    apiKey: _androidApiKey,
     appId: '1:255731454217:android:a41e28f36ac2e0705cc3d8',
     messagingSenderId: '255731454217',
     projectId: 'digital-burnout-821da',
     storageBucket: 'digital-burnout-821da.firebasestorage.app',
   );
+
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBJ4YUMlrZrQ0_PRK-4wLhDvzRitCEf7IQ',
+    apiKey: _iosApiKey,
     appId: '1:255731454217:ios:3e83bd79cc45a8175cc3d8',
     messagingSenderId: '255731454217',
     projectId: 'digital-burnout-821da',
     storageBucket: 'digital-burnout-821da.firebasestorage.app',
     iosBundleId: 'com.example.flutterCatalog',
   );
+
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyBJ4YUMlrZrQ0_PRK-4wLhDvzRitCEf7IQ',
+    apiKey: _iosApiKey,
     appId: '1:255731454217:ios:3e83bd79cc45a8175cc3d8',
     messagingSenderId: '255731454217',
     projectId: 'digital-burnout-821da',
@@ -75,7 +92,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyBZxQCjlqdWkzKlNqc8fSM1eTe3aY0w-Kc',
+    apiKey: _webApiKey,
     appId: '1:255731454217:web:ba1e73cd28a26dab5cc3d8',
     messagingSenderId: '255731454217',
     projectId: 'digital-burnout-821da',
