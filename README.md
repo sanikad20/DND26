@@ -338,6 +338,10 @@ brainlag/
 2. **Strict User Ownership**: Database repositories filter all queries by the authenticated user's Firebase UID. Users cannot view or modify another individual's assessment records.
 3. **Explicit Consent**: Continuous digital monitoring and occupational surveys require explicit user agreement before data capture.
 
+## Try the App
+
+[Download Veer Mitra (Android APK)](https://drive.google.com/drive/folders/1WX8Ct3a3gnMKwU7Wp0TwSqMjkid3WwJA?usp=drive_link)
+
 ## 👥 Team Details — Team DND
 
 **Smart India Hackathon (SIH 2026)**  
